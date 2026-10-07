@@ -129,7 +129,7 @@ export function AppShell({
             K
           </div>
           <span className="hidden font-semibold tracking-tight sm:inline">
-            Kinzo <span className="font-normal text-muted-foreground">Property</span>
+            Banjg <span className="font-normal text-muted-foreground">Property</span>
           </span>
         </Link>
         <div className="relative mx-auto flex-1 md:max-w-xl">
@@ -239,7 +239,7 @@ export function AppShell({
             />
             <div className="fixed inset-y-0 left-0 z-50 bg-sidebar pt-2 shadow-float md:hidden">
               <div className="flex items-center justify-between px-4 pb-2">
-                <span className="font-semibold">Kinzo Property</span>
+                <span className="font-semibold">Banjg Property</span>
                 <button onClick={() => setMobileNav(false)} className="p-2">
                   <X className="h-5 w-5" />
                 </button>
@@ -257,7 +257,7 @@ export function AppShell({
           className="fixed bottom-5 right-5 z-20 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-float hover:opacity-95"
         >
           <MessageSquareText className="h-4 w-4" />
-          <span className="hidden sm:inline">Ask Kinzo AI</span>
+          <span className="hidden sm:inline">Ask Banjg AI</span>
         </button>
       ) : null}
       {section ? (

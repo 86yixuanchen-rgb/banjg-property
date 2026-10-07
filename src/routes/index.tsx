@@ -19,7 +19,7 @@ import { useWorkspace } from "@/lib/workspace";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Home — Kinzo Property" },
+      { title: "Home — Banjg Property" },
       {
         name: "description",
         content: "See every repair request, who it's waiting on and what happens next.",

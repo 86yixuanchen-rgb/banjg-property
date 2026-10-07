@@ -18,12 +18,12 @@ import { columnStatus, useWorkspace } from "@/lib/workspace";
 export const Route = createFileRoute("/requests/$id")({
   head: ({ params }) => ({
     meta: [
-      { title: `${params.id} — Kinzo Property` },
+      { title: `${params.id} — Banjg Property` },
       {
         name: "description",
         content: `Status, next action and full activity timeline for ${params.id}.`,
       },
-      { property: "og:title", content: `${params.id} — Kinzo Property` },
+      { property: "og:title", content: `${params.id} — Banjg Property` },
       {
         property: "og:description",
         content: "Repair request detail with unified communication timeline.",

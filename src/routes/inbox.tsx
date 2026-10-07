@@ -19,7 +19,7 @@ import { useWorkspace } from "@/lib/workspace";
 export const Route = createFileRoute("/inbox")({
   head: () => ({
     meta: [
-      { title: "Unified Inbox — Kinzo Property" },
+      { title: "Unified Inbox — Banjg Property" },
       {
         name: "description",
         content: "Email, SMS, Teams and chat messages organised around repair requests.",
@@ -290,7 +290,7 @@ function InboxPage() {
                 <div className="grid h-7 w-7 place-items-center rounded-md bg-ai-soft text-ai">
                   <Bot className="h-4 w-4" />
                 </div>
-                <span className="text-sm font-semibold">Kinzo AI detected:</span>
+                <span className="text-sm font-semibold">Banjg AI detected:</span>
               </div>
               <div className="mt-4 space-y-3 text-sm">
                 <div>

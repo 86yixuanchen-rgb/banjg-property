@@ -40,7 +40,7 @@ export function AssistantPanel({ onClose }: { onClose: () => void }) {
           <Bot className="h-4 w-4" />
         </div>
         <div className="flex-1">
-          <div className="text-sm font-semibold">Kinzo AI</div>
+          <div className="text-sm font-semibold">Banjg AI</div>
           <div className="text-[11px] text-muted-foreground">
             Suggests actions — you stay in control
           </div>
