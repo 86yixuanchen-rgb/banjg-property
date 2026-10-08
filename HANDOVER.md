@@ -41,7 +41,7 @@ Banjg Property 是一款面向澳洲物业经理的 **AI 辅助维修协调工�
 ### 环境要求
 
 - Node.js ≥ 20
-- npm（或 bun，项目同时提供 `bunfig.toml`）
+- npm（锁文件为 `package-lock.json`）
 
 ### 启动步骤
 
