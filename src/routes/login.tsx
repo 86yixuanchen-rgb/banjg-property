@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useSignIn, useSignUp, useAuth } from "@clerk/tanstack-react-start";
+import { useSignIn, useSignUp, useAuth, useClerk } from "@clerk/tanstack-react-start";
 import { useEffect, useState } from "react";
 import { Instagram, LoaderCircle, Mail, MessageCircle, ShieldCheck } from "lucide-react";
 
@@ -14,6 +14,7 @@ function LoginPage() {
   const { isSignedIn, isLoaded: authLoaded } = useAuth();
   const { signIn, fetchStatus: signInFetch } = useSignIn();
   const { signUp, fetchStatus: signUpFetch } = useSignUp();
+  const { setActive } = useClerk();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
@@ -78,21 +79,27 @@ function LoginPage() {
 
   const verifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!signIn || !signUp) return;
+    if (!signIn || !signUp || !setActive) return;
     setError("");
+
+    let sessionId: string | null = null;
 
     if (mode === "signIn") {
       const { error: verifyErr } = await signIn.emailCode.verifyCode({ code: otp });
       if (verifyErr) { setError(verifyErr.longMessage ?? verifyErr.message ?? "Invalid code."); return; }
       const { error: finalErr } = await signIn.finalize();
       if (finalErr) { setError(finalErr.longMessage ?? finalErr.message ?? "Sign-in failed."); return; }
+      sessionId = (signIn as unknown as { createdSessionId?: string }).createdSessionId ?? null;
     } else {
       const { error: verifyErr } = await signUp.verifications.verifyEmailCode({ code: otp });
       if (verifyErr) { setError(verifyErr.longMessage ?? verifyErr.message ?? "Invalid code."); return; }
+      sessionId = (signUp as unknown as { createdSessionId?: string }).createdSessionId ?? null;
     }
-    // Don't navigate here — the useEffect watching isSignedIn handles the redirect
-    // once Clerk has fully propagated the new session, avoiding a race condition
-    // where AppShell sees !user and bounces the user back to /login.
+
+    if (sessionId) {
+      await setActive({ session: sessionId });
+    }
+    void navigate({ to: "/", replace: true });
   };
 
   const showToast = (msg: string) => {
