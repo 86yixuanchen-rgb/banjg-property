@@ -20,16 +20,27 @@ import {
 } from "lucide-react";
 import { AssistantPanel } from "./AssistantPanel";
 import { useWorkspace } from "@/lib/workspace";
+import { useAuth } from "@/lib/auth";
 
 const nav = [
   { label: "Home", icon: Home, to: "/" as const },
   { label: "Unified Inbox", icon: Inbox, to: "/inbox" as const, badge: 3 },
   { label: "Requests", icon: ClipboardList, to: "/" as const },
-  { label: "Properties", icon: Building2 },
-  { label: "Contacts", icon: Users },
-  { label: "Calendar", icon: CalendarDays },
-  { label: "Analytics", icon: BarChart3 },
-  { label: "Settings", icon: Settings },
+  {
+    label: "Properties",
+    icon: Building2,
+    to: "/workspace/$section" as const,
+    section: "properties",
+  },
+  { label: "Contacts", icon: Users, to: "/workspace/$section" as const, section: "contacts" },
+  {
+    label: "Calendar",
+    icon: CalendarDays,
+    to: "/workspace/$section" as const,
+    section: "calendar",
+  },
+  { label: "Analytics", icon: BarChart3, to: "/workspace/$section" as const, section: "analytics" },
+  { label: "Settings", icon: Settings, to: "/workspace/$section" as const, section: "settings" },
 ];
 
 export function AppShell({
@@ -46,9 +57,12 @@ export function AppShell({
   const [search, setSearch] = useState("");
   const [notifications, setNotifications] = useState(true);
   const [profile, setProfile] = useState(false);
-  const [section, setSection] = useState<string | null>(null);
   const { requests, toasts, dismissToast } = useWorkspace();
+  const { user, ready, signOut } = useAuth();
   const navigate = useNavigate();
+  useEffect(() => {
+    if (ready && !user) void navigate({ to: "/login", replace: true });
+  }, [navigate, ready, user]);
   useEffect(() => {
     if (openAssistantSignal > 0) setAssistantOpen(true);
   }, [openAssistantSignal]);
@@ -68,6 +82,10 @@ export function AppShell({
     setAssistantOpen(true);
     onOpenAI?.();
   };
+
+  if (!ready || !user) {
+    return <div className="min-h-screen bg-background" aria-label="Loading workspace" />;
+  }
 
   const sidebar = (
     <aside className="h-full w-56 shrink-0 border-r bg-sidebar p-3">
@@ -90,6 +108,7 @@ export function AppShell({
             <Link
               key={n.label}
               to={n.to}
+              params={"section" in n ? { section: n.section } : undefined}
               onClick={() => setMobileNav(false)}
               className={cls}
               activeOptions={{ exact: n.label === "Home" }}
@@ -97,18 +116,7 @@ export function AppShell({
             >
               {inner}
             </Link>
-          ) : (
-            <button
-              key={n.label}
-              onClick={() => {
-                setSection(n.label);
-                setMobileNav(false);
-              }}
-              className={cls}
-            >
-              {inner}
-            </button>
-          );
+          ) : null;
         })}
       </nav>
     </aside>
@@ -197,7 +205,7 @@ export function AppShell({
               SM
             </div>
             <div className="hidden text-left text-xs leading-tight lg:block">
-              <div className="font-medium">Sarah Miller</div>
+              <div className="font-medium">{user.name}</div>
               <div className="text-muted-foreground">Harbour Realty</div>
             </div>
             <ChevronDown className="hidden h-3.5 w-3.5 text-muted-foreground lg:block" />
@@ -205,12 +213,12 @@ export function AppShell({
           {profile ? (
             <div className="absolute right-3 top-12 w-56 rounded-lg border bg-card p-2 shadow-float">
               <div className="border-b px-3 py-2 text-xs text-muted-foreground">
-                Signed in as Sarah
+                Signed in as {user.email}
               </div>
               <button
                 onClick={() => {
                   setProfile(false);
-                  setSection("Settings");
+                  void navigate({ to: "/workspace/$section", params: { section: "settings" } });
                 }}
                 className="flex w-full items-center gap-2 rounded px-3 py-2 text-sm hover:bg-muted"
               >
@@ -218,11 +226,15 @@ export function AppShell({
                 Workspace settings
               </button>
               <button
-                onClick={() => setProfile(false)}
+                onClick={() => {
+                  setProfile(false);
+                  signOut();
+                  void navigate({ to: "/login", replace: true });
+                }}
                 className="flex w-full items-center gap-2 rounded px-3 py-2 text-sm text-muted-foreground hover:bg-muted"
               >
                 <LogOut className="h-4 w-4" />
-                Close menu
+                Sign out
               </button>
             </div>
           ) : null}
@@ -259,38 +271,6 @@ export function AppShell({
           <MessageSquareText className="h-4 w-4" />
           <span className="hidden sm:inline">Ask Banjg AI</span>
         </button>
-      ) : null}
-      {section ? (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-float">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">{section}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  This prototype area is ready for connected workspace data. Core repair workflows
-                  remain fully available.
-                </p>
-              </div>
-              <button
-                onClick={() => setSection(null)}
-                className="rounded p-1 hover:bg-muted"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <button
-              onClick={() => setSection(null)}
-              className="mt-5 w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground"
-            >
-              Done
-            </button>
-          </div>
-        </div>
       ) : null}
       <div
         className="fixed bottom-4 left-1/2 z-[70] flex -translate-x-1/2 flex-col gap-2"

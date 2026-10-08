@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as InboxRouteImport } from './routes/inbox'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as RequestsIdRouteImport } from './routes/requests.$id'
+import { Route as WorkspaceSectionRouteImport } from './routes/workspace.$section'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -23,40 +25,64 @@ const InboxRoute = InboxRouteImport.update({
   path: '/inbox',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RequestsIdRoute = RequestsIdRouteImport.update({
   id: '/requests/$id',
   path: '/requests/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorkspaceSectionRoute = WorkspaceSectionRouteImport.update({
+  id: '/workspace/$section',
+  path: '/workspace/$section',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/inbox': typeof InboxRoute
+  '/login': typeof LoginRoute
   '/requests/$id': typeof RequestsIdRoute
+  '/workspace/$section': typeof WorkspaceSectionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/inbox': typeof InboxRoute
+  '/login': typeof LoginRoute
   '/requests/$id': typeof RequestsIdRoute
+  '/workspace/$section': typeof WorkspaceSectionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/inbox': typeof InboxRoute
+  '/login': typeof LoginRoute
   '/requests/$id': typeof RequestsIdRoute
+  '/workspace/$section': typeof WorkspaceSectionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/inbox' | '/requests/$id'
+  fullPaths: '/' | '/inbox' | '/login' | '/requests/$id' | '/workspace/$section'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/inbox' | '/requests/$id'
-  id: '__root__' | '/' | '/inbox' | '/requests/$id'
+  to: '/' | '/inbox' | '/login' | '/requests/$id' | '/workspace/$section'
+  id:
+    | '__root__'
+    | '/'
+    | '/inbox'
+    | '/login'
+    | '/requests/$id'
+    | '/workspace/$section'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   InboxRoute: typeof InboxRoute
+  LoginRoute: typeof LoginRoute
   RequestsIdRoute: typeof RequestsIdRoute
+  WorkspaceSectionRoute: typeof WorkspaceSectionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -75,11 +101,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InboxRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/requests/$id': {
       id: '/requests/$id'
       path: '/requests/$id'
       fullPath: '/requests/$id'
       preLoaderRoute: typeof RequestsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/workspace/$section': {
+      id: '/workspace/$section'
+      path: '/workspace/$section'
+      fullPath: '/workspace/$section'
+      preLoaderRoute: typeof WorkspaceSectionRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -88,7 +128,9 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   InboxRoute: InboxRoute,
+  LoginRoute: LoginRoute,
   RequestsIdRoute: RequestsIdRoute,
+  WorkspaceSectionRoute: WorkspaceSectionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

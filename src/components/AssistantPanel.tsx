@@ -2,32 +2,49 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { X, Send, Bot, AlertTriangle, LoaderCircle, Check } from "lucide-react";
 import { useWorkspace } from "@/lib/workspace";
+import { askDeepSeek } from "@/lib/deepseek";
 
-type Turn = { q: string; kind: "landlord" | "attention" | "generic" };
+type Turn = { q: string; answer?: string; error?: string };
 
 export function AssistantPanel({ onClose }: { onClose: () => void }) {
-  const [turns, setTurns] = useState<Turn[]>([
-    { q: "Which repairs are waiting for landlord approval?", kind: "landlord" },
-  ]);
+  const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
-  const ask = (q: string, kind?: Turn["kind"]) => {
+  const { requests } = useWorkspace();
+  const ask = async (q: string) => {
     if (!q.trim() || loading) return;
-    const normalized = q.toLowerCase();
-    const resolved =
-      kind ??
-      (normalized.includes("attention") || normalized.includes("urgent")
-        ? "attention"
-        : normalized.includes("landlord") || normalized.includes("approval")
-          ? "landlord"
-          : "generic");
     setInput("");
     setLoading(true);
-    window.setTimeout(() => {
-      setTurns((items) => [...items, { q, kind: resolved }]);
+    try {
+      const result = await askDeepSeek({
+        data: {
+          question: q,
+          requests: requests.map(
+            ({ id, title, address, status, priority, waitingOn, nextAction }) => ({
+              id,
+              title,
+              address,
+              status,
+              priority,
+              waitingOn,
+              nextAction,
+            }),
+          ),
+        },
+      });
+      setTurns((items) => [
+        ...items,
+        result.ok ? { q, answer: result.answer } : { q, error: result.message },
+      ]);
+    } catch {
+      setTurns((items) => [
+        ...items,
+        { q, error: "The AI service is unavailable. Please try again." },
+      ]);
+    } finally {
       setLoading(false);
-    }, 550);
+    }
   };
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -59,13 +76,19 @@ export function AssistantPanel({ onClose }: { onClose: () => void }) {
             <div className="ml-auto max-w-[85%] rounded-lg rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground">
               {t.q}
             </div>
-            {t.kind === "landlord" ? (
-              <LandlordAnswer />
-            ) : t.kind === "attention" ? (
-              <AttentionAnswer />
-            ) : (
-              <GenericAnswer query={t.q} />
-            )}
+            <div
+              className={`rounded-lg border p-3 text-sm ${t.error ? "border-waiting/40 bg-waiting-soft" : "bg-ai-soft"}`}
+            >
+              <div
+                className={`flex items-center gap-2 font-medium ${t.error ? "text-waiting" : "text-ai"}`}
+              >
+                {t.error ? <AlertTriangle className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+                {t.error ? "AI setup required" : "Banjg AI"}
+              </div>
+              <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
+                {t.error ?? t.answer}
+              </p>
+            </div>
           </div>
         ))}
         {loading ? (
@@ -79,13 +102,13 @@ export function AssistantPanel({ onClose }: { onClose: () => void }) {
       <div className="border-t p-3">
         <div className="mb-2 flex flex-wrap gap-1.5">
           <button
-            onClick={() => ask("What needs my attention today?", "attention")}
+            onClick={() => void ask("What needs my attention today?")}
             className="rounded-full border px-2.5 py-1 text-xs hover:bg-muted"
           >
             What needs my attention?
           </button>
           <button
-            onClick={() => ask("Which repairs are waiting for landlord approval?", "landlord")}
+            onClick={() => void ask("Which repairs are waiting for landlord approval?")}
             className="rounded-full border px-2.5 py-1 text-xs hover:bg-muted"
           >
             Waiting on landlords
@@ -94,7 +117,7 @@ export function AssistantPanel({ onClose }: { onClose: () => void }) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            ask(input);
+            void ask(input);
           }}
           className="flex items-center gap-2 rounded-md border bg-muted px-3 py-2"
         >
