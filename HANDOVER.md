@@ -247,7 +247,35 @@ AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API
 
 ---
 
-## 九、待办事项（优先级排序）
+## 九、代码审查发现（2026-10-09）
+
+以下问题由代码审查发现，按严重程度排列：
+
+| # | 严重度 | 问题 | 涉及文件 | 说明 |
+|---|--------|------|----------|------|
+| 1 | P0 | 数据全部存内存，刷新即丢失 | `lib/workspace.tsx` | 所有请求数据存在 `useState` 中，页面刷新后重置为种子数据 |
+| 2 | P1 | Morning Briefing 硬编码 | `routes/index.tsx:32-36` | `briefing` 数组写死了 3 条请求 ID（REQ-087/093/106），不会随实际数据变化 |
+| 3 | P1 | Inbox 消息硬编码 | `routes/inbox.tsx:38-111` | `seedMessages` 写死了 6 条消息，和 requests 数据没有联动 |
+| 4 | P1 | PM 名字硬编码为 "Sarah Miller" | `routes/requests.$id.tsx:64,273`、`routes/inbox.tsx:257` | 应使用 `useAuth()` 获取当前登录用户真实名字 |
+| 5 | P2 | 无暗黑模式色值 | `styles.css` | 定义了 `@custom-variant dark` 但没有暗黑模式 CSS 变量，只有亮色方案 |
+| 6 | P2 | Logo 字母 "K" 与品牌不符 | `components/AppShell.tsx:177`、`routes/login.tsx:16` | 品牌名 "Banjg Property"，Logo 应为 "B" 或正式标识 |
+| 7 | P2 | "Requests" 导航项指向首页 | `components/AppShell.tsx:29` | `Requests` 的 `to` 设为 `"/"`，和 `Home` 完全重复 |
+| 8 | P2 | Analytics 完成率硬编码 | `routes/workspace.$section.tsx:137` | `"Completion rate"` 写死为 `"91%"`，应从 requests 计算 |
+| 9 | P3 | Modal 缺少 ESC 关闭和遮罩点击关闭 | `routes/index.tsx:227`、`routes/requests.$id.tsx:326` | 多个自定义弹窗没有监听 Escape 键，点击遮罩层也不关闭 |
+| 10 | P3 | Toast ID 用 `Date.now()` 可能冲突 | `lib/workspace.tsx:22` | 同一毫秒触发多个 toast 时 ID 会重复，建议改用递增计数器 |
+| 11 | P3 | `useMemo` 依赖不准确 | `routes/inbox.tsx:136-139` | `actions` 的 memo 依赖只写了 `selectedId`，用 eslint-disable 压制了警告 |
+
+### 做得好的部分
+
+- Clerk 认证集成到位，`useAuth()` 封装干净，`isSignedIn` 避免了竞态
+- DeepSeek 通过 server function 调用，有 Zod 校验，处理了多种异常
+- CSRF 中间件已启用（`start.ts`）
+- 组件结构清晰，有合理的无障碍标注（`aria-label`、`aria-modal`、`aria-live`）
+- TypeScript strict 模式，类型定义清晰，无 `any`
+
+---
+
+## 十、待办事项（优先级排序）
 
 ### P0 — 上线前必须完成
 
@@ -257,15 +285,27 @@ AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API
 
 ### P1 — 近期规划
 
+- [ ] **消除 PM 名字硬编码**：将 "Sarah Miller" 替换为 `useAuth()` 返回的真实用户名（涉及 `requests.$id.tsx`、`inbox.tsx`）
+- [ ] **Morning Briefing 动态化**：从实际 requests 中筛选需关注项，替换 `index.tsx` 中的硬编码数组
 - [ ] **请求数据模型扩展**：为每个请求添加 `tenantName`、`landlordName`、`tradeName`、`photos`、`timeline` 字段，摆脱从 `waitingOn` 字段推断的临时方案
 - [ ] **文件上传**：租户上传维修照片
 - [ ] **邮件/SMS 集成**：对接 SendGrid / Twilio，实现真实消息发送（当前 "Reply" 和 "Send Reminder" 仅触发 toast）
 - [ ] **日历集成**：对接 Google Calendar 或 Outlook，实现真实预约
 
-### P2 — 长期优化
+### P2 — 中期优化
 
+- [ ] **暗黑模式**：在 `styles.css` 中添加 `.dark` 下的 CSS 变量定义
+- [ ] **品牌标识修正**：Logo 字母从 "K" 改为 "B"，或替换为正式品牌图标
+- [ ] **Analytics 完成率动态计算**：从 requests 数据计算，替换硬编码 "91%"
+- [ ] **Requests 导航项**：移除冗余入口或新建独立列表页
 - [ ] **拖拽看板**：实现 Kanban 卡片拖放（推荐 `@dnd-kit/core`）
 - [ ] **多租户 / 多 PM**：支持多个物业经理账号
+
+### P3 — 长期优化
+
+- [ ] **Modal 交互完善**：ESC 键关闭 + 遮罩点击关闭（或迁移到 Radix Dialog）
+- [ ] **Toast ID 改用计数器**：避免 `Date.now()` 在极端情况下的 ID 冲突
+- [ ] **修正 Inbox useMemo 依赖**：补全依赖数组，移除 eslint-disable 注释
 - [ ] **移动端 App**：基于现有 API 开发 React Native 版本
 - [ ] **报表导出**：PDF / Excel 格式的月度维修报告
 
