@@ -32,6 +32,7 @@ Banjg Property 是一款面向澳洲物业经理的 **AI 辅助维修协调工�
 | 路由 | TanStack Router（自动生成 `routeTree.gen.ts`） |
 | 数据请求 | TanStack Query v5 |
 | 表单 | React Hook Form + Zod |
+| 认证 | [Clerk](https://clerk.com)（`@clerk/tanstack-react-start` 1.7.x） |
 | AI | DeepSeek API（`deepseek-chat` 模型） |
 | 构建 | Vite 8 + Rolldown |
 | 测试 | Vitest + Testing Library |
@@ -51,10 +52,20 @@ Banjg Property 是一款面向澳洲物业经理的 **AI 辅助维修协调工�
 git clone https://github.com/86yixuanchen-rgb/banjg-property.git
 cd banjg-property
 npm install
+```
+
+复制环境变量模板并填入真实 key：
+
+```bash
+cp .env.example .env.local
+# 编辑 .env.local，填入 Clerk 和 DeepSeek 的 key
+```
+
+```bash
 npm run dev
 ```
 
-浏览器访问 `http://localhost:3000`，使用任意邮箱登录（当前为 Demo 模式，无需真实认证）。
+浏览器访问 `http://localhost:3000`，用真实邮箱通过 Clerk Email OTP 登录。
 
 ### 可用命令
 
@@ -69,12 +80,21 @@ npm run dev
 
 ### 环境变量
 
-在项目根目录创建 `.env.local`：
+在项目根目录创建 `.env.local`（参考 `.env.example`）：
 
 ```env
+# Clerk 认证（必填）— 从 https://dashboard.clerk.com 获取
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxxxxxxxxx
+CLERK_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxxxx
+
 # DeepSeek AI 助手（可选，未配置时 AI 面板显示提示）
-DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxx
+DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxx
 ```
+
+**获取 Clerk Key 的步骤：**
+1. 登录 [dashboard.clerk.com](https://dashboard.clerk.com)
+2. 创建新应用，选择"Email code"作为认证方式
+3. 在 API Keys 页面复制 Publishable Key 和 Secret Key
 
 ---
 
@@ -88,18 +108,19 @@ src/
 │   ├── RequestCard.tsx       # 看板卡片组件（支持拖拽状态更改）
 │   └── ui/                   # shadcn/ui 基础组件库（不要手动修改）
 ├── lib/
-│   ├── auth.tsx              # 认证 Context（当前为 localStorage mock）
+│   ├── auth.tsx              # Clerk 认证封装（useAuth hook，维持统一 API）
 │   ├── data.ts               # 种子数据：RepairRequest、Column、Priority 类型
 │   ├── deepseek.ts           # DeepSeek 服务端函数（TanStack Start server fn）
 │   ├── workspace.tsx         # 全局状态 Context：请求列表、toast 通知
 │   └── utils.ts              # cn() 工具函数
 ├── routes/
-│   ├── __root.tsx            # 根路由：Provider 注入、SEO head、错误页
+│   ├── __root.tsx            # 根路由：ClerkProvider、QueryClientProvider、SEO head
 │   ├── index.tsx             # 主仪表盘：统计、AI Briefing、看板
-│   ├── login.tsx             # 登录页（Email / Instagram / WhatsApp）
+│   ├── login.tsx             # 登录页（Email OTP 两步验证 / Instagram / WhatsApp）
 │   ├── inbox.tsx             # 统一收件箱
 │   ├── requests.$id.tsx      # 维修请求详情页
 │   └── workspace.$section.tsx # 工作区（Properties / Contacts / Calendar / Analytics / Settings）
+├── start.ts                  # TanStack Start 实例（含 clerkMiddleware）
 └── styles.css                # Tailwind 全局样式 + 设计 token
 ```
 
@@ -128,18 +149,43 @@ interface RepairRequest {
 
 ---
 
-## 六、认证说明（当前为 Demo）
+## 六、认证说明（Clerk Email OTP）
 
-`src/lib/auth.tsx` 使用 `localStorage` 模拟登录，任意邮箱均可登录。
+认证由 [Clerk](https://clerk.com) 提供，使用 `@clerk/tanstack-react-start` 1.7.x。
 
-登录支持三种入口（均为 Demo 实现）：
-- **Email**：直接用邮箱地址作为用户名
-- **Instagram / WhatsApp**：按钮占位，生产环境需接入 Meta Business OAuth
+### 架构
 
-**接入真实认证时需要做的事：**
-1. 替换 `AuthProvider` 中的 `signIn`/`signOut` 为后端 API 调用
-2. 在 Meta Developer Console 配置 App，获取 `APP_ID` 和 `APP_SECRET`
-3. 将 redirect URL 加入 Meta 白名单
+```
+ClerkProvider（__root.tsx）
+    ↓
+clerkMiddleware()（start.ts，服务端）
+    ↓
+useAuth()（auth.tsx 封装）→ 所有页面通过此 hook 读取用户信息
+```
+
+### 登录流程
+
+1. 用户输入邮箱，调用 `signIn.create({ identifier })` 初始化
+2. 调用 `signIn.emailCode.sendCode()` 发送 6 位验证码
+3. 用户输入验证码，调用 `signIn.emailCode.verifyCode({ code })` 验证
+4. 调用 `signIn.finalize()` 创建 session
+
+### `useAuth()` hook API
+
+```typescript
+const { user, ready, signOut } = useAuth();
+// user: { name: string; email: string } | null
+// ready: boolean（Clerk 加载完成标志）
+// signOut: () => void
+```
+
+### Instagram / WhatsApp
+
+两个按钮目前显示"未配置"提示。要接入真实 Meta OAuth：
+1. 在 [Meta Developer Console](https://developers.facebook.com) 创建应用
+2. 在 Clerk Dashboard 的 Social Connections 启用 Facebook/Instagram OAuth
+3. 将 Clerk 的回调 URL 填入 Meta 白名单
+4. 修改 `login.tsx` 中 Instagram 按钮：`signIn.create({ strategy: "oauth_facebook", redirectUrl: "...", actionCompleteRedirectUrl: "/" })`
 
 ---
 
@@ -156,9 +202,9 @@ AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API
 
 ---
 
-## 八、已完成的代码修复（2026-10-09）
+## 八、已完成的代码修复与迭代（2026-10-09）
 
-以下问题已在本次迭代中修复并提交：
+### 第一轮：9 项 Bug 修复
 
 | # | 问题描述 | 涉及文件 |
 |---|---------|---------|
@@ -172,6 +218,18 @@ AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API
 | 8 | `AssistantPanel` 底部 4 个未使用的组件残留死代码 | `components/AssistantPanel.tsx` |
 | 9 | `workspace.$section.tsx` 单组件处理 5 种页面，改为独立子组件 | `routes/workspace.$section.tsx` |
 
+### 第二轮：Clerk 认证接入
+
+| 改动 | 文件 |
+|------|------|
+| 接入 `@clerk/tanstack-react-start`，替换 localStorage mock | `lib/auth.tsx` |
+| 根路由替换为 `ClerkProvider` | `routes/__root.tsx` |
+| 服务端加入 `clerkMiddleware()` | `start.ts` |
+| 登录页实现真实 Email OTP 两步验证流程 | `routes/login.tsx` |
+| 新增环境变量模板 | `.env.example` |
+| 修复 `params` spread 类型错误（exactOptionalPropertyTypes） | `components/AppShell.tsx` |
+| 修复 env var bracket notation 类型错误 | `lib/deepseek.ts` |
+
 ---
 
 ## 九、待办事项（优先级排序）
@@ -179,7 +237,7 @@ AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API
 ### P0 — 上线前必须完成
 
 - [ ] **数据持久化**：接入后端数据库（推荐 Supabase 或 PlanetScale），替换 Context 内存存储
-- [ ] **真实认证**：替换 localStorage mock，接入真实 Auth（推荐 Clerk 或 Auth.js）
+- [x] ~~**真实认证**：替换 localStorage mock，接入真实 Auth~~ → **已完成**（Clerk Email OTP）
 - [ ] **Meta OAuth**：接入 Instagram / WhatsApp Business API，实现真实的社交登录和消息收发
 
 ### P1 — 近期规划
@@ -206,7 +264,11 @@ AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API
 1. 将仓库连接到 Vercel
 2. 构建命令：`npm run build`
 3. 输出目录：`.output`
-4. 添加环境变量：`DEEPSEEK_API_KEY`
+4. 在 Vercel 环境变量中添加：
+   - `VITE_CLERK_PUBLISHABLE_KEY`
+   - `CLERK_SECRET_KEY`
+   - `DEEPSEEK_API_KEY`
+5. 在 Clerk Dashboard → Domains，将 Vercel 的生产域名加入白名单
 
 其他支持的部署目标：Netlify、Cloudflare Workers、Node.js 服务器（参考 [Nitro 部署文档](https://nitro.unjs.io/deploy)）。
 
