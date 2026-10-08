@@ -89,8 +89,8 @@ function LoginPage() {
     } else {
       const { error: verifyErr } = await signUp.verifications.verifyEmailCode({ code: otp });
       if (verifyErr) { setError(verifyErr.longMessage ?? verifyErr.message ?? "Invalid code."); return; }
-      const { error: finalErr } = await signUp.finalize();
-      if (finalErr) { setError(finalErr.longMessage ?? finalErr.message ?? "Sign-up failed."); return; }
+      // verifyEmailCode completes the sign-up and creates the session automatically;
+      // calling finalize() after is not needed and causes "no created session" error.
     }
 
     void navigate({ to: "/", replace: true });
