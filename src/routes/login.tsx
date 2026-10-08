@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useSignIn, useAuth } from "@clerk/tanstack-react-start";
+import { useSignIn, useSignUp, useAuth } from "@clerk/tanstack-react-start";
 import { useEffect, useState } from "react";
 import { Instagram, LoaderCircle, Mail, MessageCircle, ShieldCheck } from "lucide-react";
 
@@ -8,14 +8,18 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+type Mode = "signIn" | "signUp";
+
 function LoginPage() {
   const { isSignedIn, isLoaded: authLoaded } = useAuth();
-  const { signIn, fetchStatus } = useSignIn();
+  const { signIn, fetchStatus: signInFetch } = useSignIn();
+  const { signUp, fetchStatus: signUpFetch } = useSignUp();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<"email" | "otp">("email");
+  const [mode, setMode] = useState<Mode>("signIn");
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
 
@@ -23,27 +27,61 @@ function LoginPage() {
     if (authLoaded && isSignedIn) void navigate({ to: "/", replace: true });
   }, [authLoaded, isSignedIn, navigate]);
 
-  const loading = fetchStatus === "fetching";
+  const loading = signInFetch === "fetching" || signUpFetch === "fetching";
 
   const sendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!signIn) return;
+    if (!signIn || !signUp) return;
     setError("");
-    const { error: err } = await signIn.create({ identifier: email });
-    if (err) { setError(err.longMessage ?? err.message ?? "Failed to send code."); return; }
-    const { error: sendErr } = await signIn.emailCode.sendCode({ emailAddress: email });
-    if (sendErr) { setError(sendErr.longMessage ?? sendErr.message ?? "Failed to send code."); return; }
-    setStep("otp");
+
+    // Try sign-in first (sends code if user exists)
+    const { error: siErr } = await signIn.emailCode.sendCode({ emailAddress: email });
+    if (!siErr) {
+      setMode("signIn");
+      setStep("otp");
+      return;
+    }
+
+    // If user not found, start sign-up flow
+    if (
+      siErr.code === "form_identifier_not_found" ||
+      siErr.code === "form_param_value_invalid"
+    ) {
+      const { error: suErr } = await signUp.create({ emailAddress: email });
+      if (suErr) {
+        setError(suErr.longMessage ?? suErr.message ?? "Failed to create account.");
+        return;
+      }
+      const { error: sendErr } = await signUp.verifications.sendEmailCode();
+      if (sendErr) {
+        setError(sendErr.longMessage ?? sendErr.message ?? "Failed to send code.");
+        return;
+      }
+      setMode("signUp");
+      setStep("otp");
+      return;
+    }
+
+    setError(siErr.longMessage ?? siErr.message ?? "Failed to send code.");
   };
 
   const verifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!signIn) return;
+    if (!signIn || !signUp) return;
     setError("");
-    const { error: verifyErr } = await signIn.emailCode.verifyCode({ code: otp });
-    if (verifyErr) { setError(verifyErr.longMessage ?? verifyErr.message ?? "Invalid code. Try again."); return; }
-    const { error: finalizeErr } = await signIn.finalize();
-    if (finalizeErr) { setError(finalizeErr.longMessage ?? finalizeErr.message ?? "Sign-in failed."); return; }
+
+    if (mode === "signIn") {
+      const { error: verifyErr } = await signIn.emailCode.verifyCode({ code: otp });
+      if (verifyErr) { setError(verifyErr.longMessage ?? verifyErr.message ?? "Invalid code."); return; }
+      const { error: finalErr } = await signIn.finalize();
+      if (finalErr) { setError(finalErr.longMessage ?? finalErr.message ?? "Sign-in failed."); return; }
+    } else {
+      const { error: verifyErr } = await signUp.verifications.verifyEmailCode({ code: otp });
+      if (verifyErr) { setError(verifyErr.longMessage ?? verifyErr.message ?? "Invalid code."); return; }
+      const { error: finalErr } = await signUp.finalize();
+      if (finalErr) { setError(finalErr.longMessage ?? finalErr.message ?? "Sign-up failed."); return; }
+    }
+
     void navigate({ to: "/", replace: true });
   };
 
@@ -91,8 +129,10 @@ function LoginPage() {
             </div>
             <div className="mt-3 font-semibold">Banjg Property</div>
           </div>
-          <h2 className="text-2xl font-semibold tracking-tight">Welcome back</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Sign in to your property workspace.</p>
+          <h2 className="text-2xl font-semibold tracking-tight">Welcome</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Sign in or create your property workspace account.
+          </p>
 
           {step === "email" ? (
             <form className="mt-7 space-y-4" onSubmit={(e) => void sendOtp(e)}>
@@ -124,7 +164,7 @@ function LoginPage() {
           ) : (
             <form className="mt-7 space-y-4" onSubmit={(e) => void verifyOtp(e)}>
               <p className="text-sm text-muted-foreground">
-                We sent a 6-digit code to{" "}
+                {mode === "signUp" ? "New account — we sent a 6-digit code to " : "We sent a 6-digit code to "}
                 <span className="font-medium text-foreground">{email}</span>.
               </p>
               <label className="block text-sm font-medium">
@@ -148,8 +188,10 @@ function LoginPage() {
               >
                 {loading ? (
                   <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : mode === "signUp" ? (
+                  "Create account"
                 ) : (
-                  "Verify and sign in"
+                  "Sign in"
                 )}
               </button>
               <button
@@ -159,6 +201,7 @@ function LoginPage() {
                   setOtp("");
                   setError("");
                   if (signIn) void signIn.reset();
+                  if (signUp) void signUp.reset();
                 }}
                 className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
               >

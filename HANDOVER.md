@@ -163,12 +163,20 @@ clerkMiddleware()（start.ts，服务端）
 useAuth()（auth.tsx 封装）→ 所有页面通过此 hook 读取用户信息
 ```
 
-### 登录流程
+### 登录 / 注册流程（同一页面自动判断）
 
-1. 用户输入邮箱，调用 `signIn.create({ identifier })` 初始化
-2. 调用 `signIn.emailCode.sendCode()` 发送 6 位验证码
-3. 用户输入验证码，调用 `signIn.emailCode.verifyCode({ code })` 验证
-4. 调用 `signIn.finalize()` 创建 session
+页面不区分"登录"和"注册"——输入邮箱后自动判断：
+
+1. 先尝试 `signIn.emailCode.sendCode({ emailAddress })` 发送验证码
+2. **已有账号** → 成功，进入 OTP 步骤（`mode = "signIn"`）
+3. **新邮箱** → 收到 `form_identifier_not_found` 错误，自动切换注册流程：
+   - `signUp.create({ emailAddress })` 创建账号
+   - `signUp.verifications.sendEmailCode()` 发送验证码
+   - 进入 OTP 步骤（`mode = "signUp"`）
+4. 用户输入验证码：
+   - 登录路径：`signIn.emailCode.verifyCode({ code })` → `signIn.finalize()`
+   - 注册路径：`signUp.verifications.verifyEmailCode({ code })` → `signUp.finalize()`
+5. 成功后跳转 `/`
 
 ### `useAuth()` hook API
 
@@ -225,10 +233,18 @@ AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API
 | 接入 `@clerk/tanstack-react-start`，替换 localStorage mock | `lib/auth.tsx` |
 | 根路由替换为 `ClerkProvider` | `routes/__root.tsx` |
 | 服务端加入 `clerkMiddleware()` | `start.ts` |
-| 登录页实现真实 Email OTP 两步验证流程 | `routes/login.tsx` |
+| 登录页实现 Email OTP 两步验证流程（仅登录） | `routes/login.tsx` |
 | 新增环境变量模板 | `.env.example` |
 | 修复 `params` spread 类型错误（exactOptionalPropertyTypes） | `components/AppShell.tsx` |
 | 修复 env var bracket notation 类型错误 | `lib/deepseek.ts` |
+
+### 第三轮：同页注册支持
+
+| 改动 | 文件 |
+|------|------|
+| 登录页改为"智能登录/注册"：先尝试登录，账号不存在自动走注册流程 | `routes/login.tsx` |
+| OTP 步骤文案根据 mode（signIn/signUp）动态显示 | `routes/login.tsx` |
+| 更新交接文档，补充注册流程说明 | `HANDOVER.md` |
 
 ---
 
