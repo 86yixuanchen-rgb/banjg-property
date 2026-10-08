@@ -335,12 +335,16 @@ AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API
 部署到 Cloudflare：
 1. 先对线上库执行迁移（仅首次或 schema 变更后）：`npx wrangler d1 migrations apply DB --remote`
 2. 构建：`npm run build`
-3. 部署：`npx nitro deploy --prebuilt`（或 `npx wrangler deploy --config .output/server/wrangler.json`）
-4. 设置 Worker 密钥（用 `npx wrangler secret put <NAME>`，不要写进代码）：
+3. 部署：`npx wrangler deploy --config .output/server/wrangler.json`
+4. 设置 Worker 密钥（`npx wrangler secret put <NAME> --name banjg-property`，按提示粘贴值，不要写进代码或聊天）：
    - `VITE_CLERK_PUBLISHABLE_KEY`
    - `CLERK_SECRET_KEY`
-   - `DEEPSEEK_API_KEY`
-5. 在 Clerk Dashboard → Domains，将 Worker 的生产域名加入白名单
+   - `DEEPSEEK_API_KEY`（可选）
+5. 在 Clerk Dashboard → Domains，将 Worker 的域名加入白名单
+
+**当前线上地址**：`https://banjg-property.86yixuanchen.workers.dev`（Worker 名 `banjg-property`，Cloudflare 账号 86yixuanchen@gmail.com）。
+
+注意：`wrangler.jsonc` 里固定了 `compatibility_date`。Nitro 默认用本机"今天"的日期，而本机时区（澳洲）可能比 Cloudflare 服务器（UTC）早一天，会被拒绝（错误 10021）。更新该日期时请用不晚于 UTC 今天的值。
 
 **已验证**：在本地用 `wrangler dev` 运行构建产物，server 端能通过 `getRequest().runtime.cloudflare.env.DB` 拿到 D1 binding 并执行查询。**未验证**：带 Clerk 登录态的完整读写流程（需要真实登录）。
 

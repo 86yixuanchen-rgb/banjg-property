@@ -1,5 +1,6 @@
 {
   "name": "banjg-property",
+  "compatibility_date": "2026-10-08",
   "d1_databases": [
     {
       "binding": "DB",
