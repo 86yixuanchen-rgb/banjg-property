@@ -33,8 +33,9 @@ Banjg Property 是一款面向澳洲物业经理的 **AI 辅助维修协调工�
 | 数据请求 | TanStack Query v5 |
 | 表单 | React Hook Form + Zod |
 | 认证 | [Clerk](https://clerk.com)（`@clerk/tanstack-react-start` 1.7.x） |
+| 数据库 | [Cloudflare D1](https://developers.cloudflare.com/d1/)（SQLite）+ Drizzle ORM |
 | AI | DeepSeek API（`deepseek-chat` 模型） |
-| 构建 | Vite 8 + Rolldown |
+| 构建 | Vite 8 + Rolldown，Nitro `cloudflare-module` preset（部署到 Cloudflare Workers） |
 | 测试 | Vitest + Testing Library |
 
 ---
@@ -61,11 +62,17 @@ cp .env.example .env.local
 # 编辑 .env.local，填入 Clerk 和 DeepSeek 的 key
 ```
 
+初始化本地 D1 数据库（首次或新增迁移后执行；数据保存在 `.wrangler/state`，已被 gitignore）：
+
+```bash
+npx wrangler d1 migrations apply DB --local
+```
+
 ```bash
 npm run dev
 ```
 
-浏览器访问 `http://localhost:8080`（Vite 默认端口 8080），用真实邮箱通过 Clerk Email OTP 登录或注册。
+开发模式下，`src/lib/db.server.ts` 通过 wrangler 的 `getPlatformProxy` 读写上面的本地 D1。浏览器访问 `http://localhost:8080`（Vite 默认端口 8080），用真实邮箱通过 Clerk Email OTP 登录或注册。
 
 ### 可用命令
 
@@ -128,7 +135,21 @@ src/
 
 ## 五、数据模型
 
-当前所有数据存储在 React Context 内存中，页面刷新后重置为种子数据（`src/lib/data.ts`）。
+维修请求存储在 Cloudflare D1 的 `repair_requests` 表中（schema：`src/db/schema.ts`，迁移：`drizzle/`），按 Clerk `userId` 隔离，主键为 `(user_id, id)`。
+
+数据流：`WorkspaceProvider`（`lib/workspace.tsx`）用 TanStack Query 读取 → server function（`lib/requests.functions.ts`：`listRequests` / `createRequest` / `patchRequest`）→ `lib/db.server.ts` 的 `getDb()`。新用户首次登录时，`listRequests` 会把 `src/lib/data.ts` 里的 demo 数据写入其账户。写操作是乐观更新，失败时提示并重新拉取。
+
+目前只有 `repair_requests` 落库；Inbox 消息、详情页备注、联系人/物业仍是前端硬编码或组件内状态（见第九节）。
+
+修改 schema 的流程：
+
+```bash
+npx drizzle-kit generate                      # 生成新的 SQL 迁移
+npx wrangler d1 migrations apply DB --local   # 应用到本地
+npx wrangler d1 migrations apply DB --remote  # 应用到线上（Cloudflare 账号 86yixuanchen@gmail.com）
+```
+
+线上数据库：`banjg-property-db`，ID `6517c9ef-deb9-4d5a-8a58-455235489aae`，binding 名 `DB`（见 `wrangler.jsonc`）。
 
 ```typescript
 interface RepairRequest {
@@ -253,7 +274,7 @@ AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API
 
 | # | 严重度 | 问题 | 涉及文件 | 说明 |
 |---|--------|------|----------|------|
-| 1 | P0 | 数据全部存内存，刷新即丢失 | `lib/workspace.tsx` | 所有请求数据存在 `useState` 中，页面刷新后重置为种子数据 |
+| 1 | ~~P0~~ | ~~数据全部存内存，刷新即丢失~~ | `lib/workspace.tsx` | 已改为 Cloudflare D1 持久化（维修请求）；线上库需执行一次 `--remote` 迁移后才生效 |
 | 2 | P1 | Morning Briefing 硬编码 | `routes/index.tsx:32-36` | `briefing` 数组写死了 3 条请求 ID（REQ-087/093/106），不会随实际数据变化 |
 | 3 | P1 | Inbox 消息硬编码 | `routes/inbox.tsx:38-111` | `seedMessages` 写死了 6 条消息，和 requests 数据没有联动 |
 | 4 | P1 | PM 名字硬编码为 "Sarah Miller" | `routes/requests.$id.tsx:64,273`、`routes/inbox.tsx:257` | 应使用 `useAuth()` 获取当前登录用户真实名字 |
@@ -279,7 +300,7 @@ AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API
 
 ### P0 — 上线前必须完成
 
-- [ ] **数据持久化**：接入后端数据库（推荐 Supabase 或 PlanetScale），替换 Context 内存存储
+- [x] ~~**数据持久化**~~ → **维修请求已接入 Cloudflare D1**（代码完成，待执行线上迁移并在 Cloudflare 部署验证；Inbox 消息、备注等仍待落库）
 - [x] ~~**真实认证**：替换 localStorage mock，接入真实 Auth~~ → **已完成**（Clerk Email OTP）
 - [ ] **Meta OAuth**：接入 Instagram / WhatsApp Business API，实现真实的社交登录和消息收发
 
@@ -313,19 +334,21 @@ AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API
 
 ## 十、部署
 
-项目使用 TanStack Start（基于 Nitro），支持多种部署目标。
+项目使用 TanStack Start（基于 Nitro），构建默认目标是 **Cloudflare Workers**（`cloudflare-module`）。数据库用 D1，binding 在 `wrangler.jsonc` 中声明，构建时 Nitro 会合并进 `.output/server/wrangler.json`。**因此必须部署在 Cloudflare 上**；Vercel 等不提供 D1 binding，数据读写会报 "D1 binding `DB` is not available"。
 
-推荐方式（Vercel）：
-1. 将仓库连接到 Vercel
-2. 构建命令：`npm run build`
-3. 输出目录：`.output`
-4. 在 Vercel 环境变量中添加：
+部署到 Cloudflare：
+1. 先对线上库执行迁移（仅首次或 schema 变更后）：`npx wrangler d1 migrations apply DB --remote`
+2. 构建：`npm run build`
+3. 部署：`npx nitro deploy --prebuilt`（或 `npx wrangler deploy --config .output/server/wrangler.json`）
+4. 设置 Worker 密钥（用 `npx wrangler secret put <NAME>`，不要写进代码）：
    - `VITE_CLERK_PUBLISHABLE_KEY`
    - `CLERK_SECRET_KEY`
    - `DEEPSEEK_API_KEY`
-5. 在 Clerk Dashboard → Domains，将 Vercel 的生产域名加入白名单
+5. 在 Clerk Dashboard → Domains，将 Worker 的生产域名加入白名单
 
-其他支持的部署目标：Netlify、Cloudflare Workers、Node.js 服务器（参考 [Nitro 部署文档](https://nitro.unjs.io/deploy)）。
+**已验证**：在本地用 `wrangler dev` 运行构建产物，server 端能通过 `getRequest().runtime.cloudflare.env.DB` 拿到 D1 binding 并执行查询。**未验证**：带 Clerk 登录态的完整读写流程（需要真实登录）。
+
+**Lovable 注意**：Lovable 自己的发布环境没有这个 D1 binding，在 Lovable 预览/发布的站点上，维修请求会加载失败（看板为空）。需要用 Cloudflare 上自己部署的版本。
 
 ---
 

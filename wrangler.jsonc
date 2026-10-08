@@ -1,0 +1,11 @@
+{
+  "name": "banjg-property",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "banjg-property-db",
+      "database_id": "6517c9ef-deb9-4d5a-8a58-455235489aae",
+      "migrations_dir": "drizzle"
+    }
+  ]
+}

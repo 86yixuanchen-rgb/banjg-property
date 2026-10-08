@@ -1,5 +1,8 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import { requests as seedRequests, type Column, type Priority, type RepairRequest } from "./data";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { type Column, type Priority, type RepairRequest } from "./data";
+import { useAuth } from "./auth";
+import { createRequest, listRequests, patchRequest } from "./requests.functions";
 
 export type Toast = { id: number; message: string };
 
@@ -15,7 +18,15 @@ type WorkspaceValue = {
 const WorkspaceContext = createContext<WorkspaceValue | null>(null);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const [requests, setRequests] = useState<RepairRequest[]>(seedRequests);
+  const queryClient = useQueryClient();
+  const { isSignedIn } = useAuth();
+  const { data } = useQuery({
+    queryKey: ["requests"],
+    queryFn: () => listRequests(),
+    enabled: isSignedIn,
+    staleTime: Infinity,
+  });
+  const requests = useMemo(() => data ?? [], [data]);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const notify = (message: string) => {
@@ -24,8 +35,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     window.setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), 3500);
   };
 
-  const value = useMemo<WorkspaceValue>(
-    () => ({
+  const value = useMemo<WorkspaceValue>(() => {
+    const rollback = (message: string) => {
+      notify(message);
+      void queryClient.invalidateQueries({ queryKey: ["requests"] });
+    };
+    return {
       requests,
       addRequest: ({ title, address, priority }) => {
         const nums = requests.map((item) => Number(item.id.replace("REQ-", "")));
@@ -42,19 +57,27 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           waiting: "Just now",
           lastUpdate: "Just now",
         };
-        setRequests((items) => [item, ...items]);
+        queryClient.setQueryData<RepairRequest[]>(["requests"], (items) => [
+          item,
+          ...(items ?? []),
+        ]);
+        createRequest({ data: item }).catch(() => rollback("Could not save the new request"));
         return item;
       },
-      updateRequest: (id, patch) =>
-        setRequests((items) =>
-          items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-        ),
+      updateRequest: (id, patch) => {
+        queryClient.setQueryData<RepairRequest[]>(["requests"], (items) =>
+          (items ?? []).map((item) => (item.id === id ? { ...item, ...patch } : item)),
+        );
+        const { id: _ignored, ...fields } = patch;
+        patchRequest({ data: { id, patch: fields } }).catch(() =>
+          rollback("Could not save the change"),
+        );
+      },
       toasts,
       notify,
       dismissToast: (id) => setToasts((items) => items.filter((item) => item.id !== id)),
-    }),
-    [requests, toasts],
-  );
+    };
+  }, [requests, toasts, queryClient]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }
