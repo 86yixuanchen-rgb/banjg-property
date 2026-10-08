@@ -116,7 +116,7 @@ src/
 ├── routes/
 │   ├── __root.tsx            # 根路由：ClerkProvider、QueryClientProvider、SEO head
 │   ├── index.tsx             # 主仪表盘：统计、AI Briefing、看板
-│   ├── login.tsx             # 登录页（Email OTP 两步验证 / Instagram / WhatsApp）
+│   ├── login.tsx             # 登录页（Clerk 预制 <SignIn withSignUp /> 组件）
 │   ├── inbox.tsx             # 统一收件箱
 │   ├── requests.$id.tsx      # 维修请求详情页
 │   └── workspace.$section.tsx # 工作区（Properties / Contacts / Calendar / Analytics / Settings）
@@ -163,20 +163,18 @@ clerkMiddleware()（start.ts，服务端）
 useAuth()（auth.tsx 封装）→ 所有页面通过此 hook 读取用户信息
 ```
 
-### 登录 / 注册流程（同一页面自动判断）
+### 登录 / 注册流程
 
-页面不区分"登录"和"注册"——输入邮箱后自动判断：
+登录页使用 Clerk 预制 `<SignIn withSignUp />` 组件，自动处理：
 
-1. 先尝试 `signIn.emailCode.sendCode({ emailAddress })` 发送验证码
-2. **已有账号** → 成功，进入 OTP 步骤（`mode = "signIn"`）
-3. **新邮箱** → 收到 `form_identifier_not_found` 错误，自动切换注册流程：
-   - `signUp.create({ emailAddress })` 创建账号
-   - `signUp.verifications.sendEmailCode()` 发送验证码
-   - 进入 OTP 步骤（`mode = "signUp"`）
-4. 用户输入验证码：
-   - 登录路径：`signIn.emailCode.verifyCode({ code })` → `signIn.finalize()`
-   - 注册路径：`signUp.verifications.verifyEmailCode({ code })` → `signUp.finalize()`
-5. 成功后跳转 `/`
+- 邮箱 OTP 登录（已有账号）
+- 邮箱 OTP 注册（新账号，`withSignUp` 启用）
+- Google OAuth（若在 Clerk Dashboard 配置）
+- Bot Protection / CAPTCHA
+- Session 创建与激活
+- 登录后跳转 `/`（`forceRedirectUrl="/"`)
+
+无需手动调用 signal API。Clerk 组件内部自动完成所有流程。
 
 ### `useAuth()` hook API
 
@@ -238,13 +236,14 @@ AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API
 | 修复 `params` spread 类型错误（exactOptionalPropertyTypes） | `components/AppShell.tsx` |
 | 修复 env var bracket notation 类型错误 | `lib/deepseek.ts` |
 
-### 第三轮：同页注册支持
+### 第三轮：登录/注册改用 Clerk 预制组件
 
 | 改动 | 文件 |
 |------|------|
-| 登录页改为"智能登录/注册"：先尝试登录，账号不存在自动走注册流程 | `routes/login.tsx` |
-| OTP 步骤文案根据 mode（signIn/signUp）动态显示 | `routes/login.tsx` |
-| 更新交接文档，补充注册流程说明 | `HANDOVER.md` |
+| 删除 234 行手写 signal API，改用 `<SignIn withSignUp />` 预制组件 | `routes/login.tsx` |
+| `useAuth()` 增加 `isSignedIn` 字段（session 维度，避免 `useUser` 竞争） | `lib/auth.tsx` |
+| `AppShell` 路由守卫改用 `isSignedIn` 代替 `!user` | `components/AppShell.tsx` |
+| 更新交接文档 | `HANDOVER.md` |
 
 ---
 
