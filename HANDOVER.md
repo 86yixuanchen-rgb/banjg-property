@@ -16,10 +16,6 @@ Banjg Property 是一款面向澳洲物业经理的 **AI 辅助维修协调工�
 - AI 助手（DeepSeek）对请求进行分析并提供建议操作
 - 物业、联系人、日历、分析等工作区模块
 
-本项目由 **[Lovable.dev](https://lovable.dev)** 脚手架生成，与 Lovable 编辑器保持双向同步。
-
-> **注意**：不要对已推送的提交执行 `rebase`、`amend`、`squash` 或 `force push`，否则会破坏 Lovable 端的历史记录。
-
 ---
 
 ## 二、技术栈
@@ -347,21 +343,6 @@ AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API
 5. 在 Clerk Dashboard → Domains，将 Worker 的生产域名加入白名单
 
 **已验证**：在本地用 `wrangler dev` 运行构建产物，server 端能通过 `getRequest().runtime.cloudflare.env.DB` 拿到 D1 binding 并执行查询。**未验证**：带 Clerk 登录态的完整读写流程（需要真实登录）。
-
-**Lovable 注意**：Lovable 自己的发布环境没有这个 D1 binding，在 Lovable 预览/发布的站点上，维修请求会加载失败（看板为空）。需要用 Cloudflare 上自己部署的版本。
-
----
-
-## 十一、与 Lovable.dev 的同步关系
-
-此仓库通过 GitHub 与 Lovable 编辑器双向同步：
-- 在 Lovable 编辑器中的修改会自动提交到本仓库
-- 本地推送到 `main` 分支的提交会同步回 Lovable
-
-**操作限制**：
-- 禁止 `git push --force`
-- 禁止 `git rebase`、`git commit --amend` 对已推送的提交
-- 所有本地修改请通过正常 `git commit && git push` 提交
 
 ---
 
