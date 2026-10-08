@@ -42,10 +42,15 @@ function LoginPage() {
       return;
     }
 
-    // If user not found, start sign-up flow
+    // If user not found, start sign-up flow.
+    // sendCode returns ClerkAPIResponseError; the real code is in errors[0].code.
+    const siCode: string =
+      (siErr as { errors?: { code?: string }[] }).errors?.[0]?.code ??
+      (siErr as { code?: string }).code ??
+      "";
     if (
-      siErr.code === "form_identifier_not_found" ||
-      siErr.code === "form_param_value_invalid"
+      siCode === "form_identifier_not_found" ||
+      siCode === "form_param_value_invalid"
     ) {
       const { error: suErr } = await signUp.create({ emailAddress: email });
       if (suErr) {
@@ -62,7 +67,13 @@ function LoginPage() {
       return;
     }
 
-    setError(siErr.longMessage ?? siErr.message ?? "Failed to send code.");
+    const siMsg =
+      (siErr as { errors?: { longMessage?: string; message?: string }[] }).errors?.[0]?.longMessage ??
+      (siErr as { errors?: { message?: string }[] }).errors?.[0]?.message ??
+      siErr.longMessage ??
+      siErr.message ??
+      "Failed to send code.";
+    setError(siMsg);
   };
 
   const verifyOtp = async (e: React.FormEvent) => {
