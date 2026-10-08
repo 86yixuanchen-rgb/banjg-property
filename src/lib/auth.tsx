@@ -1,59 +1,28 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-
-export type AuthProviderName = "email" | "instagram" | "whatsapp";
+import { useClerk, useUser } from "@clerk/tanstack-react-start";
 
 export type SessionUser = {
   name: string;
   email: string;
-  provider: AuthProviderName;
 };
-
-type AuthContextValue = {
-  user: SessionUser | null;
-  ready: boolean;
-  signIn: (user: SessionUser) => void;
-  signOut: () => void;
-};
-
-const STORAGE_KEY = "banjg.session.v1";
-const AuthContext = createContext<AuthContextValue | null>(null);
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<SessionUser | null>(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
-      setUser(saved ? (JSON.parse(saved) as SessionUser) : null);
-    } catch {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } finally {
-      setReady(true);
-    }
-  }, []);
-
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user,
-      ready,
-      signIn: (nextUser) => {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser));
-        setUser(nextUser);
-      },
-      signOut: () => {
-        window.localStorage.removeItem(STORAGE_KEY);
-        setUser(null);
-      },
-    }),
-    [ready, user],
-  );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
 
 export function useAuth() {
-  const value = useContext(AuthContext);
-  if (!value) throw new Error("useAuth must be used inside AuthProvider");
-  return value;
+  const { user, isLoaded } = useUser();
+  const { signOut: clerkSignOut } = useClerk();
+
+  const sessionUser: SessionUser | null = user
+    ? {
+        name:
+          user.fullName ??
+          user.firstName ??
+          user.primaryEmailAddress?.emailAddress?.split("@")[0] ??
+          "User",
+        email: user.primaryEmailAddress?.emailAddress ?? "",
+      }
+    : null;
+
+  return {
+    user: sessionUser,
+    ready: isLoaded,
+    signOut: () => void clerkSignOut(),
+  };
 }

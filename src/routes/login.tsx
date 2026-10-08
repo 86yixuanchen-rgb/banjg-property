@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useSignIn, useAuth } from "@clerk/tanstack-react-start";
 import { useEffect, useState } from "react";
 import { Instagram, LoaderCircle, Mail, MessageCircle, ShieldCheck } from "lucide-react";
-import { useAuth, type AuthProviderName } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — Banjg Property" }] }),
@@ -9,24 +9,50 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { user, ready, signIn } = useAuth();
+  const { isSignedIn, isLoaded: authLoaded } = useAuth();
+  const { signIn, fetchStatus } = useSignIn();
   const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
-  const [provider, setProvider] = useState<AuthProviderName | null>(null);
+  const [otp, setOtp] = useState("");
+  const [step, setStep] = useState<"email" | "otp">("email");
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
 
   useEffect(() => {
-    if (ready && user) void navigate({ to: "/", replace: true });
-  }, [navigate, ready, user]);
+    if (authLoaded && isSignedIn) void navigate({ to: "/", replace: true });
+  }, [authLoaded, isSignedIn, navigate]);
 
-  const complete = (nextProvider: AuthProviderName, nextEmail: string, name: string) => {
-    setProvider(nextProvider);
-    window.setTimeout(() => {
-      signIn({ provider: nextProvider, email: nextEmail, name });
-      void navigate({ to: "/", replace: true });
-    }, 450);
+  const loading = fetchStatus === "fetching";
+
+  const sendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!signIn) return;
+    setError("");
+    const { error: err } = await signIn.create({ identifier: email });
+    if (err) { setError(err.longMessage ?? err.message ?? "Failed to send code."); return; }
+    const { error: sendErr } = await signIn.emailCode.sendCode({ emailAddress: email });
+    if (sendErr) { setError(sendErr.longMessage ?? sendErr.message ?? "Failed to send code."); return; }
+    setStep("otp");
   };
 
-  if (!ready || user) {
+  const verifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!signIn) return;
+    setError("");
+    const { error: verifyErr } = await signIn.emailCode.verifyCode({ code: otp });
+    if (verifyErr) { setError(verifyErr.longMessage ?? verifyErr.message ?? "Invalid code. Try again."); return; }
+    const { error: finalizeErr } = await signIn.finalize();
+    if (finalizeErr) { setError(finalizeErr.longMessage ?? finalizeErr.message ?? "Sign-in failed."); return; }
+    void navigate({ to: "/", replace: true });
+  };
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3500);
+  };
+
+  if (!authLoaded || isSignedIn) {
     return (
       <div className="grid min-h-screen place-items-center bg-background">
         <LoaderCircle className="h-5 w-5 animate-spin text-primary" aria-label="Loading" />
@@ -56,6 +82,7 @@ function LoginPage() {
           <ShieldCheck className="h-4 w-4" /> Secure workspace access
         </div>
       </section>
+
       <section className="flex items-center justify-center bg-card px-5 py-12">
         <div className="w-full max-w-sm">
           <div className="mb-8 lg:hidden">
@@ -67,73 +94,116 @@ function LoginPage() {
           <h2 className="text-2xl font-semibold tracking-tight">Welcome back</h2>
           <p className="mt-2 text-sm text-muted-foreground">Sign in to your property workspace.</p>
 
-          <form
-            className="mt-7 space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              complete("email", email, email.split("@")[0] || "Property manager");
-            }}
-          >
-            <label className="block text-sm font-medium">
-              Work email
-              <input
-                required
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@agency.com"
-                className="mt-1.5 h-11 w-full rounded-md border bg-background px-3 font-normal outline-none focus:border-ring"
-              />
-            </label>
-            <button
-              disabled={provider !== null}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-medium text-primary-foreground disabled:opacity-60"
-            >
-              {provider === "email" ? (
-                <LoaderCircle className="h-4 w-4 animate-spin" />
-              ) : (
-                <Mail className="h-4 w-4" />
-              )}
-              Continue with email
-            </button>
-          </form>
+          {step === "email" ? (
+            <form className="mt-7 space-y-4" onSubmit={(e) => void sendOtp(e)}>
+              <label className="block text-sm font-medium">
+                Work email
+                <input
+                  required
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@agency.com"
+                  className="mt-1.5 h-11 w-full rounded-md border bg-background px-3 font-normal outline-none focus:border-ring"
+                />
+              </label>
+              {error ? <p className="text-xs text-destructive">{error}</p> : null}
+              <button
+                disabled={loading}
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-medium text-primary-foreground disabled:opacity-60"
+              >
+                {loading ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4" />
+                )}
+                Continue with email
+              </button>
+            </form>
+          ) : (
+            <form className="mt-7 space-y-4" onSubmit={(e) => void verifyOtp(e)}>
+              <p className="text-sm text-muted-foreground">
+                We sent a 6-digit code to{" "}
+                <span className="font-medium text-foreground">{email}</span>.
+              </p>
+              <label className="block text-sm font-medium">
+                Verification code
+                <input
+                  required
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                  placeholder="123456"
+                  className="mt-1.5 h-11 w-full rounded-md border bg-background px-3 font-mono text-lg tracking-widest outline-none focus:border-ring"
+                />
+              </label>
+              {error ? <p className="text-xs text-destructive">{error}</p> : null}
+              <button
+                disabled={loading || otp.length < 6}
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-medium text-primary-foreground disabled:opacity-60"
+              >
+                {loading ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Verify and sign in"
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("email");
+                  setOtp("");
+                  setError("");
+                  if (signIn) void signIn.reset();
+                }}
+                className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
+              >
+                Use a different email
+              </button>
+            </form>
+          )}
 
           <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
             or
           </div>
           <div className="space-y-2.5">
             <button
-              onClick={() => complete("instagram", "instagram@connected.local", "Instagram user")}
-              disabled={provider !== null}
+              onClick={() =>
+                showToast("Instagram login requires Meta OAuth app credentials — coming soon.")
+              }
+              disabled={loading}
               className="flex h-11 w-full items-center justify-center gap-2 rounded-md border text-sm font-medium hover:bg-muted disabled:opacity-60"
             >
-              {provider === "instagram" ? (
-                <LoaderCircle className="h-4 w-4 animate-spin" />
-              ) : (
-                <Instagram className="h-4 w-4" />
-              )}
+              <Instagram className="h-4 w-4" />
               Continue with Instagram
             </button>
             <button
-              onClick={() => complete("whatsapp", "whatsapp@connected.local", "WhatsApp user")}
-              disabled={provider !== null}
+              onClick={() =>
+                showToast("WhatsApp login is not available yet — use email to sign in.")
+              }
+              disabled={loading}
               className="flex h-11 w-full items-center justify-center gap-2 rounded-md border text-sm font-medium hover:bg-muted disabled:opacity-60"
             >
-              {provider === "whatsapp" ? (
-                <LoaderCircle className="h-4 w-4 animate-spin" />
-              ) : (
-                <MessageCircle className="h-4 w-4" />
-              )}
+              <MessageCircle className="h-4 w-4" />
               Continue with WhatsApp
             </button>
           </div>
           <p className="mt-6 text-center text-xs leading-5 text-muted-foreground">
-            Instagram and WhatsApp buttons use the product flow now; production Meta OAuth will be
-            enabled when the Meta app credentials and approved redirect URLs are configured.
+            Instagram and WhatsApp sign-in will be enabled once Meta OAuth app credentials and
+            approved redirect URLs are configured.
           </p>
         </div>
       </section>
+
+      {toast ? (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 rounded-lg bg-foreground px-4 py-3 text-sm text-background shadow-float">
+          {toast}
+        </div>
+      ) : null}
     </main>
   );
 }

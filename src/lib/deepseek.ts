@@ -39,7 +39,7 @@ export const askDeepSeek = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const apiKey = process.env.DEEPSEEK_API_KEY;
+    const apiKey = process.env["DEEPSEEK_API_KEY"];
     if (!apiKey) {
       return {
         ok: false as const,

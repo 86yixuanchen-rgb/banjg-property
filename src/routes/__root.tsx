@@ -12,8 +12,8 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { ClerkProvider } from "@clerk/tanstack-react-start";
 import { WorkspaceProvider } from "../lib/workspace";
-import { AuthProvider } from "../lib/auth";
 
 function NotFoundComponent() {
   return (
@@ -123,12 +123,12 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+    <ClerkProvider>
+      <QueryClientProvider client={queryClient}>
         <WorkspaceProvider>
           <Outlet />
         </WorkspaceProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
   );
 }

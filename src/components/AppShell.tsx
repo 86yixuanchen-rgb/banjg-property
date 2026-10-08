@@ -149,7 +149,7 @@ export function AppShell({
             <Link
               key={n.label}
               to={n.to}
-              params={"section" in n ? { section: n.section } : undefined}
+              {...("section" in n ? { params: { section: n.section } } : {})}
               onClick={() => setMobileNav(false)}
               className={cls}
               activeOptions={{ exact: n.label === "Home" }}
