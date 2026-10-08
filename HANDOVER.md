@@ -65,7 +65,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-浏览器访问 `http://localhost:3000`，用真实邮箱通过 Clerk Email OTP 登录。
+浏览器访问 `http://localhost:8080`（Vite 默认端口 8080），用真实邮箱通过 Clerk Email OTP 登录或注册。
 
 ### 可用命令
 
@@ -176,22 +176,22 @@ useAuth()（auth.tsx 封装）→ 所有页面通过此 hook 读取用户信息
 
 无需手动调用 signal API。Clerk 组件内部自动完成所有流程。
 
-### `useAuth()` hook API
+### `useAuth()` hook API（`src/lib/auth.tsx`）
 
 ```typescript
-const { user, ready, signOut } = useAuth();
-// user: { name: string; email: string } | null
+const { user, ready, isSignedIn, signOut } = useAuth();
+// user: { name: string; email: string } | null（用户资料，可能短暂为 null）
 // ready: boolean（Clerk 加载完成标志）
+// isSignedIn: boolean（session 级别，比 user 更快更新，用于路由守卫）
 // signOut: () => void
 ```
 
-### Instagram / WhatsApp
+### 添加更多登录方式（Google / Instagram / WhatsApp）
 
-两个按钮目前显示"未配置"提示。要接入真实 Meta OAuth：
-1. 在 [Meta Developer Console](https://developers.facebook.com) 创建应用
-2. 在 Clerk Dashboard 的 Social Connections 启用 Facebook/Instagram OAuth
-3. 将 Clerk 的回调 URL 填入 Meta 白名单
-4. 修改 `login.tsx` 中 Instagram 按钮：`signIn.create({ strategy: "oauth_facebook", redirectUrl: "...", actionCompleteRedirectUrl: "/" })`
+当前登录页使用 Clerk 预制组件，已配置的认证方式会自动显示。要添加新方式：
+1. 在 [Clerk Dashboard](https://dashboard.clerk.com) → Social Connections 启用对应 OAuth provider
+2. 按提示在对应 Developer Console 创建 OAuth 应用并配置回调 URL
+3. `<SignIn />` 组件会自动显示新的登录按钮，无需修改代码
 
 ---
 
