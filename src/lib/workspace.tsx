@@ -28,8 +28,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     () => ({
       requests,
       addRequest: ({ title, address, priority }) => {
-        const nextNumber =
-          Math.max(...requests.map((item) => Number(item.id.replace("REQ-", "")))) + 1;
+        const nums = requests.map((item) => Number(item.id.replace("REQ-", "")));
+        const nextNumber = (nums.length ? Math.max(...nums) : 108) + 1;
         const item: RepairRequest = {
           id: `REQ-${nextNumber}`,
           title,

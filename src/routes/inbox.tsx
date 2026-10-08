@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Mail,
   MessageSquare,
@@ -109,23 +109,39 @@ const seedMessages = [
     role: "Trade · 17 Elm Pl, Leichhardt",
   },
 ];
-const actions = [
-  "Mark landlord approval as received",
-  "Move request to Ready to Schedule",
-  "Draft a message to CoolAir Services",
-  "Draft a tenant status update",
-];
+function getActionsForMessage(msg: (typeof seedMessages)[0]): string[] {
+  const base: string[] = [];
+  if (msg.role.startsWith("Landlord")) {
+    base.push("Mark landlord approval as received", "Move request to Ready to Schedule");
+  } else if (msg.role.startsWith("Trade")) {
+    base.push("Update appointment in calendar", "Notify tenant of schedule change");
+  } else if (msg.role.startsWith("Tenant") || msg.role.startsWith("Maintenance")) {
+    base.push("Review and action the update", "Draft a tenant status update");
+  }
+  base.push(`Draft a reply to ${msg.from}`);
+  if (msg.req) base.push(`Link message to ${msg.req}`);
+  return base.slice(0, 4);
+}
 
 function InboxPage() {
   const [ch, setCh] = useState<string>("All");
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState(seedMessages);
   const [selectedId, setSelectedId] = useState(1);
-  const [checked, setChecked] = useState([true, true, true, true]);
+  const [checked, setChecked] = useState<boolean[]>([]);
   const [approved, setApproved] = useState(false);
   const [replying, setReplying] = useState(false);
   const [reply, setReply] = useState("");
   const { updateRequest, notify } = useWorkspace();
+  const actions = useMemo(
+    () => (selected ? getActionsForMessage(selected) : []),
+    [selectedId], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  useEffect(() => {
+    setChecked(actions.map(() => true));
+    setApproved(false);
+    setReplying(false);
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
   const list = useMemo(
     () =>
       messages.filter(

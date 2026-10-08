@@ -15,6 +15,7 @@ import { AppShell } from "@/components/AppShell";
 import { RequestCard } from "@/components/RequestCard";
 import { columns, type Priority } from "@/lib/data";
 import { useWorkspace } from "@/lib/workspace";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -36,8 +37,15 @@ const briefing = [
 
 function Dashboard() {
   const { requests, addRequest, notify } = useWorkspace();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [priority, setPriority] = useState<"All" | Priority>("All");
+  const now = new Date();
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const dateStr = `${dayNames[now.getDay()]}, ${now.getDate()} ${monthNames[now.getMonth()]}`;
+  const hour = now.getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const [newOpen, setNewOpen] = useState(false);
   const [aiSeed, setAiSeed] = useState(0);
   const filtered = useMemo(
@@ -75,8 +83,8 @@ function Dashboard() {
       <div className="space-y-6 p-4 sm:p-6 lg:p-8">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-sm text-muted-foreground">Wednesday, 7 October</p>
-            <h1 className="text-2xl font-semibold tracking-tight">Good morning, Sarah</h1>
+            <p className="text-sm text-muted-foreground">{dateStr}</p>
+            <h1 className="text-2xl font-semibold tracking-tight">{greeting}, {user?.name ?? "there"}</h1>
           </div>
           <button
             onClick={() => setNewOpen(true)}
