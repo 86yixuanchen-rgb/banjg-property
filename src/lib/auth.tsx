@@ -1,4 +1,4 @@
-import { useClerk, useUser } from "@clerk/tanstack-react-start";
+import { useClerk, useUser, useAuth as useClerkAuth } from "@clerk/tanstack-react-start";
 
 export type SessionUser = {
   name: string;
@@ -7,6 +7,7 @@ export type SessionUser = {
 
 export function useAuth() {
   const { user, isLoaded } = useUser();
+  const { isSignedIn } = useClerkAuth();
   const { signOut: clerkSignOut } = useClerk();
 
   const sessionUser: SessionUser | null = user
@@ -23,6 +24,7 @@ export function useAuth() {
   return {
     user: sessionUser,
     ready: isLoaded,
+    isSignedIn: isSignedIn ?? false,
     signOut: () => void clerkSignOut(),
   };
 }

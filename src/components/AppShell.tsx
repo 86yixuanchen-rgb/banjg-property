@@ -59,14 +59,14 @@ export function AppShell({
   const [notifOpen, setNotifOpen] = useState(false);
   const [profile, setProfile] = useState(false);
   const { requests, toasts, dismissToast } = useWorkspace();
-  const { user, ready, signOut } = useAuth();
+  const { user, ready, isSignedIn, signOut } = useAuth();
   const navigate = useNavigate();
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (ready && !user) void navigate({ to: "/login", replace: true });
-  }, [navigate, ready, user]);
+    if (ready && !isSignedIn) void navigate({ to: "/login", replace: true });
+  }, [navigate, ready, isSignedIn]);
 
   useEffect(() => {
     if (openAssistantSignal > 0) setAssistantOpen(true);
@@ -124,8 +124,8 @@ export function AppShell({
     onOpenAI?.();
   };
 
-  if (!ready || !user) {
-    return <div className="min-h-screen bg-background" aria-label="Loading workspace" />;
+  if (!ready || !isSignedIn) {
+    return <div className="grid min-h-screen place-items-center bg-background" aria-label="Loading workspace" />;
   }
 
   const sidebar = (
@@ -274,7 +274,7 @@ export function AppShell({
               aria-expanded={profile}
             >
               <div className="grid h-8 w-8 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-primary">
-                {user.name
+                {(user?.name ?? "?")
                   .split(" ")
                   .map((w) => w[0])
                   .join("")
@@ -282,7 +282,7 @@ export function AppShell({
                   .toUpperCase()}
               </div>
               <div className="hidden text-left text-xs leading-tight lg:block">
-                <div className="font-medium">{user.name}</div>
+                <div className="font-medium">{user?.name ?? ""}</div>
                 <div className="text-muted-foreground">Harbour Realty</div>
               </div>
               <ChevronDown className="hidden h-3.5 w-3.5 text-muted-foreground lg:block" />
@@ -290,7 +290,7 @@ export function AppShell({
             {profile ? (
               <div className="absolute right-0 top-10 w-56 rounded-lg border bg-card p-2 shadow-float">
                 <div className="border-b px-3 py-2 text-xs text-muted-foreground">
-                  Signed in as {user.email}
+                  Signed in as {user?.email ?? ""}
                 </div>
                 <button
                   onClick={() => {
