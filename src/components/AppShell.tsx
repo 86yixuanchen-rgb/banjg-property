@@ -22,10 +22,12 @@ import {
 import { AssistantPanel } from "./AssistantPanel";
 import { useWorkspace } from "@/lib/workspace";
 import { useAuth } from "@/lib/auth";
+import { useQuery } from "@tanstack/react-query";
+import { getInbox } from "@/lib/gmail.functions";
 
 const nav = [
   { label: "Home", icon: Home, to: "/" as const },
-  { label: "Unified Inbox", icon: Inbox, to: "/inbox" as const, badge: 3 },
+  { label: "Unified Inbox", icon: Inbox, to: "/inbox" as const },
   { label: "Requests", icon: ClipboardList, to: "/" as const, view: "list" as const },
   {
     label: "Properties",
@@ -60,6 +62,13 @@ export function AppShell({
   const [profile, setProfile] = useState(false);
   const { requests, toasts, dismissToast } = useWorkspace();
   const { user, ready, isSignedIn, signOut } = useAuth();
+  const { data: inbox } = useQuery({
+    queryKey: ["inbox"],
+    queryFn: () => getInbox(),
+    staleTime: Infinity,
+    enabled: isSignedIn,
+  });
+  const unreadCount = inbox?.connected ? inbox.emails.filter((m) => m.unread).length : 0;
   const navigate = useNavigate();
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -140,9 +149,9 @@ export function AppShell({
             <>
               <n.icon className="h-4 w-4" />
               <span className="flex-1">{n.label}</span>
-              {n.badge ? (
+              {n.to === "/inbox" && unreadCount > 0 ? (
                 <span className="rounded bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
-                  {n.badge}
+                  {unreadCount}
                 </span>
               ) : null}
             </>
@@ -288,7 +297,7 @@ export function AppShell({
               </div>
               <div className="hidden text-left text-xs leading-tight lg:block">
                 <div className="font-medium">{user?.name ?? ""}</div>
-                <div className="text-muted-foreground">Harbour Realty</div>
+                <div className="text-muted-foreground">Property Manager</div>
               </div>
               <ChevronDown className="hidden h-3.5 w-3.5 text-muted-foreground lg:block" />
             </button>
