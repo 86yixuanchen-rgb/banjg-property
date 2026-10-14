@@ -1,23 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Mail,
-  MessageSquare,
-  Users,
-  MessageCircle,
-  Bot,
-  Check,
-  Reply,
-  Search,
-  X,
-  Send,
-  ArrowLeft,
-} from "lucide-react";
+import { ArrowLeft, Inbox as InboxIcon, Mail, Reply, Search, Send } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { useAuth } from "@/lib/auth";
 import { useWorkspace } from "@/lib/workspace";
-import { disconnectGmail, getInbox, syncGmail, type InboxEmail } from "@/lib/gmail.functions";
+import { disconnectGmail, getInbox, sendEmail, syncGmail } from "@/lib/gmail.functions";
 import { linkEmail } from "@/lib/incidents.functions";
 
 export const Route = createFileRoute("/inbox")({
@@ -26,170 +13,35 @@ export const Route = createFileRoute("/inbox")({
       { title: "Unified Inbox — Banjg Property" },
       {
         name: "description",
-        content: "Email, SMS, Teams and chat messages organised around repair requests.",
+        content: "Your Gmail inbox organised around repair requests.",
       },
     ],
   }),
   component: InboxPage,
 });
-const channels = [
-  { k: "All", icon: null },
-  { k: "Email", icon: Mail },
-  { k: "SMS", icon: MessageSquare },
-  { k: "Teams", icon: Users },
-  { k: "Chat", icon: MessageCircle },
-] as const;
-const seedMessages = [
-  {
-    id: 1,
-    from: "David Chen",
-    ch: "Email",
-    subj: "Re: Air conditioning quote",
-    prev: "$680 is fine. Please go ahead.",
-    body: "$680 is fine. Please go ahead.",
-    req: "REQ-101",
-    time: "8:02 AM",
-    unread: true,
-    role: "Landlord · 14 King Street, Unit 7",
-  },
-  {
-    id: 2,
-    from: "Mia Russo",
-    ch: "SMS",
-    subj: "Inspection access",
-    prev: "Thursday after 2pm works for me",
-    body: "Hi Sarah, Thursday after 2pm works for me. Please let the inspector know to buzz Unit 2.",
-    req: "REQ-099",
-    time: "7:48 AM",
-    unread: true,
-    role: "Tenant · 2/7 Bay St, Coogee",
-  },
-  {
-    id: 3,
-    from: "Sparkie Bros",
-    ch: "Email",
-    subj: "Cancellation — 88 Park Rd",
-    prev: "Sorry, our electrician is unwell today…",
-    body: "Sorry, our electrician is unwell today and we need to cancel. We can offer tomorrow at 9am instead.",
-    req: "REQ-106",
-    time: "7:41 AM",
-    unread: true,
-    role: "Trade · 88 Park Rd, Alexandria",
-  },
-  {
-    id: 4,
-    from: "Tom (Maintenance)",
-    ch: "Teams",
-    subj: "Hill St leak",
-    prev: "Photos look like a cracked trap",
-    body: "Photos look like a cracked trap. I recommend a plumber attends today before it worsens.",
-    req: "REQ-093",
-    time: "7:10 AM",
-    unread: false,
-    role: "Maintenance coordinator",
-  },
-  {
-    id: 5,
-    from: "Lena Ortiz",
-    ch: "Chat",
-    subj: "Kitchen tap",
-    prev: "It's dripping constantly now",
-    body: "It's dripping constantly now. I've turned the isolation valve down but it hasn't stopped.",
-    req: "REQ-108",
-    time: "6:55 AM",
-    unread: false,
-    role: "Tenant · 3/22 Oxford St, Paddington",
-  },
-  {
-    id: 6,
-    from: "Inner West Plumbing",
-    ch: "Email",
-    subj: "Booking confirmed",
-    prev: "We'll attend at 1:30pm today",
-    body: "We'll attend at 1:30pm today. The tenant has confirmed access.",
-    req: "REQ-090",
-    time: "Yesterday",
-    unread: false,
-    role: "Trade · 17 Elm Pl, Leichhardt",
-  },
-];
-type Msg = {
-  id: string;
-  from: string;
-  ch: string;
-  subj: string;
-  prev: string;
-  body: string;
-  req: string;
-  time: string;
-  unread: boolean;
-  role: string;
-  gmail?: { fromEmail: string };
-};
-
-const demoMessages: Msg[] = seedMessages.map((m) => ({ ...m, id: String(m.id) }));
 
 function formatTime(ms: number) {
   const d = new Date(ms);
-  const now = new Date();
-  return d.toDateString() === now.toDateString()
+  return d.toDateString() === new Date().toDateString()
     ? d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : d.toLocaleDateString([], { day: "numeric", month: "short" });
 }
 
-function emailToMsg(e: InboxEmail, read: Set<string>): Msg {
-  return {
-    id: e.id,
-    from: e.fromName,
-    ch: "Email",
-    subj: e.subject,
-    prev: e.snippet,
-    body: e.body,
-    req: "",
-    time: formatTime(e.receivedAt),
-    unread: e.unread && !read.has(e.id),
-    role: `Email · ${e.fromEmail}`,
-    gmail: { fromEmail: e.fromEmail },
-  };
-}
-
-function getActionsForMessage(msg: Msg): string[] {
-  const base: string[] = [];
-  if (msg.role.startsWith("Landlord")) {
-    base.push("Mark landlord approval as received", "Move request to Ready to Schedule");
-  } else if (msg.role.startsWith("Trade")) {
-    base.push("Update appointment in calendar", "Notify tenant of schedule change");
-  } else if (msg.role.startsWith("Tenant") || msg.role.startsWith("Maintenance")) {
-    base.push("Review and action the update", "Draft a tenant status update");
-  }
-  base.push(`Draft a reply to ${msg.from}`);
-  if (msg.req) base.push(`Link message to ${msg.req}`);
-  return base.slice(0, 4);
-}
-
 function InboxPage() {
-  const { user } = useAuth();
-  const managerName = user?.name || "Property Manager";
-  const [ch, setCh] = useState<string>("All");
   const [query, setQuery] = useState("");
-  const [demo, setDemo] = useState<Msg[]>(demoMessages);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
-  const [selectedId, setSelectedId] = useState("1");
-  const [checked, setChecked] = useState<boolean[]>([]);
-  const [approved, setApproved] = useState(false);
+  const [selectedId, setSelectedId] = useState("");
   const [replying, setReplying] = useState(false);
   const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const { addRequest, updateRequest, notify } = useWorkspace();
+  const { requests, addRequest, notify } = useWorkspace();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const inbox = useQuery({ queryKey: ["inbox"], queryFn: () => getInbox(), staleTime: Infinity });
   const connected = inbox.data?.connected === true;
-  const messages = useMemo<Msg[]>(
-    () => (inbox.data?.connected ? inbox.data.emails.map((e) => emailToMsg(e, readIds)) : demo),
-    [inbox.data, demo, readIds],
-  );
-  const selected = messages.find((m) => m.id === selectedId);
+  const emails = useMemo(() => (inbox.data?.connected ? inbox.data.emails : []), [inbox.data]);
+  const selected = emails.find((m) => m.id === selectedId);
 
   const sync = async () => {
     setSyncing(true);
@@ -225,40 +77,62 @@ function InboxPage() {
     window.history.replaceState(null, "", "/inbox");
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const actions = useMemo(
-    () => (selected && !selected.gmail ? getActionsForMessage(selected) : []),
-    [selectedId], // eslint-disable-line react-hooks/exhaustive-deps
-  );
   useEffect(() => {
-    setChecked(actions.map(() => true));
-    setApproved(false);
     setReplying(false);
-  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const list = useMemo(
-    () =>
-      messages.filter(
-        (m) =>
-          (ch === "All" || m.ch === ch) &&
-          [m.from, m.subj, m.prev, m.req].some((v) =>
-            v.toLowerCase().includes(query.toLowerCase()),
-          ),
-      ),
-    [messages, ch, query],
-  );
+    setReply("");
+  }, [selectedId]);
+
+  const list = useMemo(() => {
+    const q = query.toLowerCase();
+    return emails.filter((m) =>
+      [m.fromName, m.fromEmail, m.subject, m.snippet].some((v) => v.toLowerCase().includes(q)),
+    );
+  }, [emails, query]);
+
+  const linkedRequest = selected?.requestId
+    ? requests.find((r) => r.id === selected.requestId)
+    : undefined;
+
   const choose = (id: string) => {
     setSelectedId(id);
-    setApproved(false);
-    if (connected) setReadIds((ids) => new Set(ids).add(id));
-    else setDemo((items) => items.map((m) => (m.id === id ? { ...m, unread: false } : m)));
+    setReadIds((ids) => new Set(ids).add(id));
   };
-  const ChannelIcon =
-    selected?.ch === "SMS"
-      ? MessageSquare
-      : selected?.ch === "Teams"
-        ? Users
-        : selected?.ch === "Chat"
-          ? MessageCircle
-          : Mail;
+
+  const submitReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected || !reply.trim()) return;
+    setSending(true);
+    try {
+      const result = await sendEmail({
+        data: {
+          to: selected.fromEmail,
+          subject: /^re:/i.test(selected.subject) ? selected.subject : `Re: ${selected.subject}`,
+          body: reply.trim(),
+          requestId: selected.requestId,
+          threadId: selected.threadId,
+        },
+      });
+      if (result.ok) {
+        notify(`Reply sent to ${selected.fromName}`);
+        setReplying(false);
+        setReply("");
+        await queryClient.invalidateQueries({ queryKey: ["inbox"] });
+        await queryClient.invalidateQueries({ queryKey: ["incident"] });
+      } else if (result.code === "RECONNECT") {
+        notify("Gmail needs to be reconnected to send emails.");
+      } else {
+        notify("The reply could not be sent. Please try again.");
+      }
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const refreshLinks = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    await queryClient.invalidateQueries({ queryKey: ["incident"] });
+  };
+
   return (
     <AppShell>
       <div className="flex h-full min-h-[calc(100vh-3.5rem)] flex-col xl:flex-row">
@@ -267,84 +141,87 @@ function InboxPage() {
         >
           <div className="border-b p-3">
             <h1 className="mb-2 font-semibold">Unified Inbox</h1>
-            {inbox.isSuccess ? (
-              connected ? (
-                <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
-                  <span className="truncate">Gmail: {inbox.data.email}</span>
-                  <span className="flex shrink-0 gap-2">
-                    <button disabled={syncing} onClick={() => void sync()} className="text-primary">
-                      {syncing ? "Syncing…" : "Sync"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        void disconnectGmail().then(() => {
-                          setSelectedId("");
-                          return queryClient.invalidateQueries({ queryKey: ["inbox"] });
-                        });
-                      }}
-                    >
-                      Disconnect
-                    </button>
-                  </span>
-                </div>
-              ) : (
-                <div className="mb-2 rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
-                  Showing demo messages.{" "}
-                  <a href="/api/gmail/connect" className="font-medium text-primary">
-                    Connect Gmail
-                  </a>{" "}
-                  to see your real inbox.
-                </div>
-              )
+            {inbox.isSuccess && connected ? (
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+                <span className="truncate">Gmail: {inbox.data.email}</span>
+                <span className="flex shrink-0 gap-2">
+                  <button disabled={syncing} onClick={() => void sync()} className="text-primary">
+                    {syncing ? "Syncing…" : "Sync"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      void disconnectGmail().then(() => {
+                        setSelectedId("");
+                        return queryClient.invalidateQueries({ queryKey: ["inbox"] });
+                      });
+                    }}
+                  >
+                    Disconnect
+                  </button>
+                </span>
+              </div>
             ) : null}
-            <div className="relative mb-2">
+            <div className="relative">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search messages…"
+                placeholder="Search emails…"
                 className="h-8 w-full rounded-md border bg-muted pl-8 pr-3 text-xs outline-none"
               />
             </div>
-            <div className="flex flex-wrap gap-1">
-              {channels.map((c) => (
-                <button
-                  key={c.k}
-                  onClick={() => setCh(c.k)}
-                  className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs ${ch === c.k ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}
-                >
-                  {c.icon ? <c.icon className="h-3 w-3" /> : null}
-                  {c.k}
-                </button>
-              ))}
-            </div>
           </div>
           <div className="flex-1 overflow-y-auto">
-            {list.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => choose(m.id)}
-                className={`w-full border-b px-4 py-3 text-left ${m.id === selected?.id ? "border-l-2 border-l-primary bg-primary-soft" : "hover:bg-muted"}`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className={`text-sm ${m.unread ? "font-semibold" : ""}`}>{m.from}</span>
-                  <span className="text-[11px] text-muted-foreground">{m.time}</span>
-                </div>
-                <div className="truncate text-xs font-medium">{m.subj}</div>
-                <div className="truncate text-xs text-muted-foreground">{m.prev}</div>
-                <div className="mt-1.5 flex gap-1.5">
-                  <span className="rounded bg-muted px-1.5 font-mono text-[10px] text-muted-foreground">
-                    {m.req}
-                  </span>
-                  <span className="rounded bg-muted px-1.5 text-[10px] text-muted-foreground">
-                    {m.ch}
-                  </span>
-                </div>
-              </button>
-            ))}
-            {list.length === 0 ? (
+            {list.map((m) => {
+              const unread = m.unread && !readIds.has(m.id);
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => choose(m.id)}
+                  className={`w-full border-b px-4 py-3 text-left ${m.id === selected?.id ? "border-l-2 border-l-primary bg-primary-soft" : "hover:bg-muted"}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`truncate text-sm ${unread ? "font-semibold" : ""}`}>
+                      {m.fromName}
+                    </span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      {formatTime(m.receivedAt)}
+                    </span>
+                  </div>
+                  <div className="truncate text-xs font-medium">{m.subject}</div>
+                  <div className="truncate text-xs text-muted-foreground">{m.snippet}</div>
+                  <div className="mt-1.5 flex gap-1.5">
+                    <span className="rounded bg-muted px-1.5 font-mono text-[10px] text-muted-foreground">
+                      {m.requestId ?? "Unlinked"}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+            {inbox.isSuccess && !connected ? (
+              <div className="p-6 text-center">
+                <InboxIcon className="mx-auto h-8 w-8 text-muted-foreground" />
+                <p className="mt-3 text-sm font-medium">No mailbox connected</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Connect your Gmail to bring tenant, landlord and repair team emails into your
+                  requests.
+                </p>
+                <a
+                  href="/api/gmail/connect"
+                  className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                >
+                  <Mail className="h-4 w-4" />
+                  Connect Gmail
+                </a>
+              </div>
+            ) : null}
+            {connected && list.length === 0 ? (
               <div className="p-8 text-center text-sm text-muted-foreground">
-                No messages match this filter.
+                {emails.length === 0
+                  ? syncing
+                    ? "Fetching your emails…"
+                    : "No emails yet. Press Sync to fetch the last 30 days."
+                  : "No emails match your search."}
               </div>
             ) : null}
           </div>
@@ -361,49 +238,32 @@ function InboxPage() {
               </button>
               <div className="rounded-lg border bg-card p-5 shadow-card sm:p-6">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <ChannelIcon className="h-3.5 w-3.5" />
-                  {selected.ch} · {selected.time}
+                  <Mail className="h-3.5 w-3.5" />
+                  Email · {new Date(selected.receivedAt).toLocaleString()}
                 </div>
-                <h2 className="mt-2 text-xl font-semibold">{selected.subj}</h2>
+                <h2 className="mt-2 text-xl font-semibold">{selected.subject}</h2>
                 <div className="mt-3 flex items-center gap-3 border-b pb-4">
                   <div className="grid h-9 w-9 place-items-center rounded-full bg-muted text-xs font-semibold">
-                    {selected.from
+                    {selected.fromName
                       .split(" ")
                       .map((x) => x[0])
                       .join("")
-                      .slice(0, 2)}
+                      .slice(0, 2)
+                      .toUpperCase()}
                   </div>
                   <div className="text-sm">
-                    <div className="font-medium">{selected.from}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {selected.gmail ? selected.role : `${selected.role} · to ${managerName}`}
-                    </div>
+                    <div className="font-medium">{selected.fromName}</div>
+                    <div className="text-xs text-muted-foreground">{selected.fromEmail}</div>
                   </div>
                 </div>
                 <p className="whitespace-pre-wrap break-words py-6 text-[15px]">{selected.body}</p>
-                {selected.gmail ? (
-                  <a
-                    href={`mailto:${selected.gmail.fromEmail}?subject=${encodeURIComponent(/^re:/i.test(selected.subj) ? selected.subj : `Re: ${selected.subj}`)}`}
-                    className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
-                  >
-                    <Reply className="h-4 w-4" />
-                    Reply in your email app
-                  </a>
-                ) : replying ? (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (!reply.trim()) return;
-                      notify(`Reply sent to ${selected.from}`);
-                      setReplying(false);
-                      setReply("");
-                    }}
-                  >
+                {replying ? (
+                  <form onSubmit={(e) => void submitReply(e)}>
                     <textarea
                       autoFocus
                       value={reply}
                       onChange={(e) => setReply(e.target.value)}
-                      placeholder={`Reply to ${selected.from}…`}
+                      placeholder={`Reply to ${selected.fromName}…`}
                       className="min-h-28 w-full rounded-md border p-3 text-sm outline-none focus:border-ring"
                     />
                     <div className="mt-2 flex justify-end gap-2">
@@ -414,9 +274,12 @@ function InboxPage() {
                       >
                         Cancel
                       </button>
-                      <button className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground">
+                      <button
+                        disabled={sending || !reply.trim()}
+                        className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-60"
+                      >
                         <Send className="h-4 w-4" />
-                        Send reply
+                        {sending ? "Sending…" : "Send reply"}
                       </button>
                     </div>
                   </form>
@@ -432,122 +295,98 @@ function InboxPage() {
               </div>
             </div>
             <aside className="w-full shrink-0 border-l bg-card p-5 xl:w-96">
-              {selected.gmail ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <div className="grid h-7 w-7 place-items-center rounded-md bg-ai-soft text-ai">
-                      <Mail className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm font-semibold">From your Gmail inbox</span>
-                  </div>
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    This email is not linked to a repair request yet.
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Repair request
+              </div>
+              {selected.requestId ? (
+                <div className="mt-3 space-y-3 text-sm">
+                  <Link
+                    to="/requests/$id"
+                    params={{ id: selected.requestId }}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {selected.requestId}
+                    {linkedRequest ? ` — ${linkedRequest.title}` : ""}
+                  </Link>
+                  {linkedRequest ? (
+                    <>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Stage</div>
+                        {linkedRequest.column} · {linkedRequest.status}
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Next action</div>
+                        {linkedRequest.nextAction}
+                      </div>
+                    </>
+                  ) : null}
+                  <button
+                    onClick={() =>
+                      void linkEmail({ data: { emailId: selected.id, requestId: null } })
+                        .then(refreshLinks)
+                        .then(() => notify("Email unlinked"))
+                    }
+                    className="rounded border px-2 py-1 text-xs hover:bg-muted"
+                  >
+                    Unlink from {selected.requestId}
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-3 space-y-4 text-sm">
+                  <p className="text-muted-foreground">
+                    This email is not linked to a request. Emails are linked automatically when the
+                    sender has been added to a request.
                   </p>
                   <button
                     onClick={() => {
                       const created = addRequest({
-                        title: selected.subj.slice(0, 200),
+                        title: selected.subject.slice(0, 200),
                         address: "Address to be confirmed",
                         priority: "Medium",
                       });
-                      notify(`${created.id} created from email`);
                       void linkEmail({ data: { emailId: selected.id, requestId: created.id } });
+                      notify(`${created.id} created from email`);
                       void navigate({ to: "/requests/$id", params: { id: created.id } });
                     }}
-                    className="mt-4 w-full rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground"
+                    className="w-full rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground"
                   >
                     Create repair request from this email
                   </button>
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    Gmail access is read-only. Nothing is sent or changed in your mailbox.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2">
-                    <div className="grid h-7 w-7 place-items-center rounded-md bg-ai-soft text-ai">
-                      <Bot className="h-4 w-4" />
-                    </div>
-                    <span className="text-sm font-semibold">Banjg AI detected:</span>
-                  </div>
-                  <div className="mt-4 space-y-3 text-sm">
-                    <div>
-                      <div className="text-xs text-muted-foreground">Related request</div>
-                      <Link
-                        to="/requests/$id"
-                        params={{ id: selected.req }}
-                        className="font-medium text-primary hover:underline"
+                  {requests.some((r) => r.column !== "Completed") ? (
+                    <label className="block text-xs text-muted-foreground">
+                      Or link to an existing request
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          if (!id) return;
+                          void linkEmail({ data: { emailId: selected.id, requestId: id } })
+                            .then(refreshLinks)
+                            .then(() => notify(`Email linked to ${id}`));
+                        }}
+                        className="mt-1 block h-9 w-full rounded-md border bg-background px-2 text-sm text-foreground"
                       >
-                        {selected.req} — {selected.subj}
-                      </Link>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Detected intent</div>
-                      <span className="inline-flex items-center gap-1 rounded bg-done-soft px-2 py-0.5 font-medium text-done">
-                        <Check className="h-3.5 w-3.5" />
-                        Actionable update received
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-5">
-                    <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Suggested workflow actions
-                    </div>
-                    <div className="space-y-2">
-                      {actions.map((a, i) => (
-                        <label
-                          key={a}
-                          className="flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm hover:bg-muted"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked[i]}
-                            disabled={approved}
-                            onChange={() =>
-                              setChecked((items) => items.map((v, j) => (j === i ? !v : v)))
-                            }
-                            className="mt-0.5 accent-primary"
-                          />
-                          <span>
-                            <span className="mr-1 text-muted-foreground">{i + 1}.</span>
-                            {a}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  {approved ? (
-                    <div className="mt-4 rounded-md bg-done-soft p-3 text-sm text-done">
-                      {checked.filter(Boolean).length} actions approved. Drafts are ready for
-                      review.
-                    </div>
-                  ) : (
-                    <button
-                      disabled={!checked.some(Boolean)}
-                      onClick={() => {
-                        setApproved(true);
-                        updateRequest(selected.req, {
-                          column: "Scheduled",
-                          status: "Ready to schedule",
-                          lastUpdate: "Just now",
-                        });
-                        notify(`${checked.filter(Boolean).length} workflow actions applied`);
-                      }}
-                      className="mt-4 w-full rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
-                    >
-                      Review & Approve Actions
-                    </button>
-                  )}
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    Nothing is sent or changed until you approve.
-                  </p>
-                </>
+                        <option value="">Choose a request…</option>
+                        {requests
+                          .filter((r) => r.column !== "Completed")
+                          .map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.id} — {r.title}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  ) : null}
+                </div>
               )}
+              <p className="mt-6 text-xs text-muted-foreground">
+                Replies are sent from your Gmail account and appear in the request timeline.
+              </p>
             </aside>
           </>
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-            Select a message to read it.
+            {connected ? "Select an email to read it." : "Connect Gmail to see your emails here."}
           </div>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { getRequestUrl } from "@tanstack/react-start/server";
 import { auth } from "@clerk/tanstack-react-start/server";
 import { desc, eq } from "drizzle-orm";
@@ -19,6 +20,8 @@ export type InboxEmail = {
   body: string;
   receivedAt: number;
   unread: boolean;
+  requestId: string | null;
+  threadId: string;
 };
 
 export const getInbox = createServerFn({ method: "GET" }).handler(async () => {
@@ -44,6 +47,8 @@ export const getInbox = createServerFn({ method: "GET" }).handler(async () => {
       body: r.body,
       receivedAt: r.receivedAt,
       unread: r.unread,
+      requestId: r.requestId,
+      threadId: r.threadId,
     }));
   return {
     connected: true as const,
@@ -74,3 +79,37 @@ export const disconnectGmail = createServerFn({ method: "POST" }).handler(async 
   await gmail.disconnectAccount(userId);
   return { ok: true as const };
 });
+
+export const sendEmail = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      to: z.string().trim().toLowerCase().email().max(200),
+      subject: z.string().trim().min(1).max(300),
+      body: z.string().trim().min(1).max(20000),
+      requestId: z
+        .string()
+        .regex(/^REQ-\d+$/)
+        .nullable(),
+      threadId: z.string().max(100).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const userId = await requireUserId();
+    const gmail = await import("./gmail.server");
+    try {
+      await gmail.sendMail(userId, getRequestUrl().origin, {
+        to: data.to,
+        subject: data.subject,
+        body: data.body,
+        requestId: data.requestId,
+        ...(data.threadId ? { threadId: data.threadId } : {}),
+      });
+      return { ok: true as const };
+    } catch (error) {
+      if (error instanceof gmail.ReconnectRequired) {
+        return { ok: false as const, code: "RECONNECT" as const };
+      }
+      console.error("Gmail send failed", error);
+      return { ok: false as const, code: "ERROR" as const };
+    }
+  });

@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Column, type Priority, type RepairRequest } from "./data";
 import { useAuth } from "./auth";
@@ -8,6 +8,7 @@ export type Toast = { id: number; message: string };
 
 type WorkspaceValue = {
   requests: RepairRequest[];
+  loaded: boolean;
   addRequest: (input: { title: string; address: string; priority: Priority }) => RepairRequest;
   updateRequest: (id: string, patch: Partial<RepairRequest>) => void;
   toasts: Toast[];
@@ -28,9 +29,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   });
   const requests = useMemo(() => data ?? [], [data]);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastCounter = useRef(0);
 
   const notify = (message: string) => {
-    const id = Date.now();
+    const id = ++toastCounter.current;
     setToasts((items) => [...items, { id, message }]);
     window.setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), 3500);
   };
@@ -42,6 +44,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
     return {
       requests,
+      loaded: data !== undefined,
       addRequest: ({ title, address, priority }) => {
         const nums = requests.map((item) => Number(item.id.replace("REQ-", "")));
         const nextNumber = (nums.length ? Math.max(...nums) : 108) + 1;
@@ -52,7 +55,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           priority,
           column: "New",
           status: "Awaiting triage",
-          waitingOn: "Sarah (PM)",
+          waitingOn: "Property Manager",
           nextAction: "Review request & assign trade",
           waiting: "Just now",
           lastUpdate: "Just now",
@@ -77,7 +80,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       notify,
       dismissToast: (id) => setToasts((items) => items.filter((item) => item.id !== id)),
     };
-  }, [requests, toasts, queryClient]);
+  }, [requests, data, toasts, queryClient]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }

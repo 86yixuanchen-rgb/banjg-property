@@ -17,6 +17,7 @@ import {
   Link2,
   Trash2,
   Flag,
+  CalendarDays,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { columns, priorityTone, type Column } from "@/lib/data";
@@ -32,6 +33,13 @@ import {
   type IncidentEmail,
 } from "@/lib/incidents.functions";
 import { participantRoles } from "@/db/schema";
+import { sendEmail } from "@/lib/gmail.functions";
+import {
+  addAppointment,
+  addQuote,
+  decideQuote,
+  deleteAppointment,
+} from "@/lib/workspace.functions";
 
 export const Route = createFileRoute("/requests/$id")({
   head: ({ params }) => ({
@@ -55,7 +63,7 @@ type Role = (typeof participantRoles)[number];
 type Entry = {
   key: string;
   at: number;
-  kind: "email-in" | "email-out" | "status" | "note" | "created";
+  kind: "email-in" | "email-out" | "status" | "note" | "created" | "quote" | "appointment";
   who: string;
   role: string;
   title: string;
@@ -109,7 +117,13 @@ function Detail() {
   const { requests, updateRequest, notify } = useWorkspace();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminder, setReminder] = useState({ to: "", subject: "", body: "" });
+  const [sending, setSending] = useState(false);
+  const [quoteForm, setQuoteForm] = useState({ supplier: "", amount: "", description: "" });
   const [quoteOpen, setQuoteOpen] = useState(false);
+  const [apptForm, setApptForm] = useState({ title: "", when: "", location: "" });
+  const [apptOpen, setApptOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
@@ -180,9 +194,6 @@ function Detail() {
     );
   }
 
-  const quoteMatch = r.nextAction.match(/\$([\d,]+)/);
-  const quoteAmount = quoteMatch ? quoteMatch[0] : null;
-  const tradeName = d?.participants.find((p) => p.role === "Repair Team")?.name ?? "Trade partner";
   const stepIndex = columns.findIndex((c) => c.name === r.column);
 
   const participants = d?.participants ?? [];
@@ -234,6 +245,85 @@ function Detail() {
     } catch {
       notify("Could not add this person.");
     }
+  };
+
+  const openReminder = () => {
+    const waiting = r.waitingOn.toLowerCase();
+    const target =
+      participants.find((p) => waiting.includes(p.name.toLowerCase())) ??
+      participants.find((p) => waiting.includes(p.role.toLowerCase())) ??
+      participants[0];
+    const first = target?.name.split(" ")[0] ?? "there";
+    setReminder({
+      to: target?.email ?? "",
+      subject: `Follow-up: ${r.title} (${r.id})`,
+      body: `Hi ${first},\n\nA quick follow-up on the repair request "${r.title}" at ${r.address}.\n\nNext step: ${r.nextAction}\n\nCould you please let me know where this is up to?\n\nThanks,\n${user?.name ?? ""}`,
+    });
+    setReminderOpen(true);
+  };
+
+  const submitReminder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSending(true);
+    try {
+      const result = await sendEmail({ data: { ...reminder, requestId: r.id } });
+      if (result.ok) {
+        setReminderOpen(false);
+        await refresh();
+        notify(`Email sent to ${reminder.to}`);
+      } else if (result.code === "RECONNECT") {
+        notify("Gmail needs to be connected (or reconnected) in the Inbox before sending.");
+      } else {
+        notify("The email could not be sent. Please try again.");
+      }
+    } catch {
+      notify("The email could not be sent. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const submitQuote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = Number(quoteForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    await addQuote({
+      data: {
+        requestId: r.id,
+        supplier: quoteForm.supplier,
+        amount,
+        description: quoteForm.description,
+      },
+    });
+    setQuoteForm({ supplier: "", amount: "", description: "" });
+    setQuoteOpen(false);
+    await refresh();
+    notify("Quote recorded");
+  };
+
+  const decide = async (id: number, decision: "Approved" | "Rejected") => {
+    await decideQuote({ data: { id, decision } });
+    if (decision === "Approved") changeColumn("Scheduled", { status: "Ready to schedule" });
+    await refresh();
+    notify(`Quote ${decision.toLowerCase()}`);
+  };
+
+  const submitAppointment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const startsAt = new Date(apptForm.when).getTime();
+    if (!Number.isFinite(startsAt)) return;
+    await addAppointment({
+      data: {
+        title: apptForm.title,
+        startsAt,
+        location: apptForm.location,
+        requestId: r.id,
+      },
+    });
+    setApptForm({ title: "", when: "", location: "" });
+    setApptOpen(false);
+    await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: ["appointments"] })]);
+    notify("Appointment booked");
   };
 
   return (
@@ -374,21 +464,185 @@ function Detail() {
               <div className="text-sm text-muted-foreground">Waiting on {r.waitingOn}</div>
               <div className="mt-4 flex gap-2">
                 <button
-                  onClick={() => notify(`Reminder queued to ${r.waitingOn}`)}
+                  onClick={openReminder}
                   className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
                 >
                   <Bell className="h-4 w-4" />
                   Send Reminder
                 </button>
-                {quoteAmount ? (
-                  <button
-                    onClick={() => setQuoteOpen(true)}
-                    className="flex items-center gap-2 rounded-md border bg-card px-4 py-2 text-sm font-medium"
-                  >
-                    <FileText className="h-4 w-4" />
-                    View Quote
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-card p-5 shadow-card">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 font-semibold">
+                  <FileText className="h-4 w-4" />
+                  Quotes
+                </h2>
+                <button
+                  onClick={() => setQuoteOpen((v) => !v)}
+                  className="flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add quote
+                </button>
+              </div>
+              {quoteOpen ? (
+                <form
+                  onSubmit={(e) => void submitQuote(e)}
+                  className="mb-4 grid gap-2 rounded-md bg-muted p-3 sm:grid-cols-[1fr_8rem]"
+                >
+                  <input
+                    required
+                    value={quoteForm.supplier}
+                    onChange={(e) => setQuoteForm({ ...quoteForm, supplier: e.target.value })}
+                    placeholder="Supplier"
+                    aria-label="Supplier"
+                    className="h-9 rounded-md border bg-background px-3 text-sm outline-none focus:border-ring"
+                  />
+                  <input
+                    required
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    value={quoteForm.amount}
+                    onChange={(e) => setQuoteForm({ ...quoteForm, amount: e.target.value })}
+                    placeholder="Amount ($)"
+                    aria-label="Amount"
+                    className="h-9 rounded-md border bg-background px-3 text-sm outline-none focus:border-ring"
+                  />
+                  <input
+                    value={quoteForm.description}
+                    onChange={(e) => setQuoteForm({ ...quoteForm, description: e.target.value })}
+                    placeholder="What the quote covers (optional)"
+                    aria-label="Description"
+                    className="h-9 rounded-md border bg-background px-3 text-sm outline-none focus:border-ring sm:col-span-2"
+                  />
+                  <button className="rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground sm:col-span-2">
+                    Save quote
                   </button>
-                ) : null}
+                </form>
+              ) : null}
+              {(d?.quotes ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">No quotes recorded yet.</p>
+              ) : null}
+              <div className="space-y-2">
+                {(d?.quotes ?? []).map((q) => (
+                  <div
+                    key={q.id}
+                    className="flex flex-wrap items-center gap-3 rounded-md border p-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium">
+                        {q.supplier} · ${q.amount.toFixed(2)}
+                      </div>
+                      {q.description ? (
+                        <div className="truncate text-xs text-muted-foreground">
+                          {q.description}
+                        </div>
+                      ) : null}
+                    </div>
+                    {q.status === "Pending" ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => void decide(q.id, "Approved")}
+                          className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => void decide(q.id, "Rejected")}
+                          className="rounded-md border px-3 py-1.5 text-xs"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    ) : (
+                      <span
+                        className={`rounded px-2 py-0.5 text-xs font-medium ${q.status === "Approved" ? "bg-done-soft text-done" : "bg-muted text-muted-foreground"}`}
+                      >
+                        {q.status}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-card p-5 shadow-card">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 font-semibold">
+                  <CalendarDays className="h-4 w-4" />
+                  Appointments
+                </h2>
+                <button
+                  onClick={() => setApptOpen((v) => !v)}
+                  className="flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Book
+                </button>
+              </div>
+              {apptOpen ? (
+                <form
+                  onSubmit={(e) => void submitAppointment(e)}
+                  className="mb-4 grid gap-2 rounded-md bg-muted p-3 sm:grid-cols-2"
+                >
+                  <input
+                    required
+                    value={apptForm.title}
+                    onChange={(e) => setApptForm({ ...apptForm, title: e.target.value })}
+                    placeholder="e.g. Plumber attends"
+                    aria-label="Title"
+                    className="h-9 rounded-md border bg-background px-3 text-sm outline-none focus:border-ring sm:col-span-2"
+                  />
+                  <input
+                    required
+                    type="datetime-local"
+                    value={apptForm.when}
+                    onChange={(e) => setApptForm({ ...apptForm, when: e.target.value })}
+                    aria-label="Date and time"
+                    className="h-9 rounded-md border bg-background px-3 text-sm outline-none focus:border-ring"
+                  />
+                  <input
+                    value={apptForm.location}
+                    onChange={(e) => setApptForm({ ...apptForm, location: e.target.value })}
+                    placeholder={r.address}
+                    aria-label="Location"
+                    className="h-9 rounded-md border bg-background px-3 text-sm outline-none focus:border-ring"
+                  />
+                  <button className="rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground sm:col-span-2">
+                    Book appointment
+                  </button>
+                </form>
+              ) : null}
+              {(d?.appointments ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nothing booked yet.</p>
+              ) : null}
+              <div className="space-y-2">
+                {(d?.appointments ?? []).map((a) => (
+                  <div key={a.id} className="flex items-center gap-3 rounded-md border p-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium">{a.title}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatWhen(a.startsAt)}
+                        {a.location ? ` · ${a.location}` : ""}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() =>
+                        void deleteAppointment({ data: { id: a.id } }).then(() => {
+                          void queryClient.invalidateQueries({ queryKey: ["appointments"] });
+                          return refresh();
+                        })
+                      }
+                      className="rounded p-1 text-muted-foreground hover:bg-muted"
+                      aria-label={`Cancel ${a.title}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -431,6 +685,10 @@ function Detail() {
                             <Mail className="h-3 w-3 text-primary" />
                           ) : t.kind === "note" ? (
                             <StickyNote className="h-3 w-3 text-done" />
+                          ) : t.kind === "quote" ? (
+                            <FileText className="h-3 w-3 text-primary" />
+                          ) : t.kind === "appointment" ? (
+                            <CalendarDays className="h-3 w-3 text-primary" />
                           ) : (
                             <Flag className="h-3 w-3 text-primary" />
                           )}
@@ -644,62 +902,82 @@ function Detail() {
           </div>
         </div>
       </div>
-      {quoteOpen ? (
+      {reminderOpen ? (
         <div
           className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4"
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-xl rounded-xl border bg-card p-6 shadow-float">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="font-mono text-xs text-muted-foreground">QUOTE</div>
-                <h2 className="text-xl font-semibold">{tradeName}</h2>
-              </div>
-              <button
-                onClick={() => setQuoteOpen(false)}
-                className="rounded p-1 hover:bg-muted"
-                aria-label="Close quote"
-              >
+          <form
+            onSubmit={(e) => void submitReminder(e)}
+            className="w-full max-w-lg rounded-xl border bg-card p-6 shadow-float"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">Send email</h2>
+              <button type="button" onClick={() => setReminderOpen(false)} className="p-1">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="my-6 rounded-lg bg-muted p-5">
-              <div className="flex justify-between border-b pb-3 text-sm">
-                <span>{r.title}</span>
-                <span className="font-medium">{quoteAmount}</span>
-              </div>
-              <div className="flex justify-between pt-3 text-sm">
-                <span>GST (inc.)</span>
-                <span>Included</span>
-              </div>
-              <div className="mt-3 flex justify-between text-lg font-semibold">
-                <span>Total</span>
-                <span>{quoteAmount}</span>
-              </div>
+            {!d?.gmailConnected ? (
+              <p className="mt-3 rounded-md bg-muted p-3 text-sm text-muted-foreground">
+                Gmail is not connected yet.{" "}
+                <Link to="/inbox" className="font-medium text-primary">
+                  Connect it in the Inbox
+                </Link>{" "}
+                to send emails from here.
+              </p>
+            ) : null}
+            <div className="mt-4 space-y-3">
+              <input
+                required
+                type="email"
+                list="people-emails"
+                value={reminder.to}
+                onChange={(e) => setReminder({ ...reminder, to: e.target.value })}
+                placeholder="To"
+                aria-label="To"
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-ring"
+              />
+              <datalist id="people-emails">
+                {participants.map((p) => (
+                  <option key={p.email} value={p.email}>
+                    {p.name} · {p.role}
+                  </option>
+                ))}
+              </datalist>
+              <input
+                required
+                value={reminder.subject}
+                onChange={(e) => setReminder({ ...reminder, subject: e.target.value })}
+                placeholder="Subject"
+                aria-label="Subject"
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-ring"
+              />
+              <textarea
+                required
+                value={reminder.body}
+                onChange={(e) => setReminder({ ...reminder, body: e.target.value })}
+                aria-label="Message"
+                className="min-h-40 w-full rounded-md border p-3 text-sm outline-none focus:border-ring"
+              />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Valid for 14 days. Parts subject to availability.
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-4 flex justify-end gap-2">
               <button
-                onClick={() => setQuoteOpen(false)}
+                type="button"
+                onClick={() => setReminderOpen(false)}
                 className="rounded-md border px-4 py-2 text-sm"
               >
-                Close
+                Cancel
               </button>
               <button
-                onClick={() => {
-                  setQuoteOpen(false);
-                  notify("Quote marked approved and trade notified");
-                  changeColumn("Scheduled", { status: "Ready to schedule" });
-                }}
-                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                disabled={sending || !d?.gmailConnected}
+                className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
               >
-                Approve quote
+                <Send className="h-4 w-4" />
+                {sending ? "Sending…" : "Send email"}
               </button>
             </div>
-          </div>
+          </form>
         </div>
       ) : null}
       {noteOpen ? (

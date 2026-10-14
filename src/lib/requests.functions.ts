@@ -3,7 +3,7 @@ import { auth } from "@clerk/tanstack-react-start/server";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { repairRequests, requestEvents } from "@/db/schema";
-import { requests as seedRequests, type RepairRequest } from "@/lib/data";
+import { type RepairRequest } from "@/lib/data";
 
 const priority = z.enum(["Urgent", "High", "Medium", "Low"]);
 const column = z.enum(["New", "Waiting", "Action Needed", "Scheduled", "Completed"]);
@@ -78,12 +78,7 @@ export const listRequests = createServerFn({ method: "GET" }).handler(async () =
     .from(repairRequests)
     .where(eq(repairRequests.userId, userId))
     .orderBy(asc(repairRequests.sortOrder));
-  if (existing.length > 0) return existing.map(toRequest);
-
-  // First sign-in: give the account the demo board so it isn't empty.
-  const rows = seedRequests.map((r, i) => toRow(userId, r, i + 1));
-  await db.insert(repairRequests).values(rows).onConflictDoNothing();
-  return seedRequests;
+  return existing.map(toRequest);
 });
 
 export const createRequest = createServerFn({ method: "POST" })

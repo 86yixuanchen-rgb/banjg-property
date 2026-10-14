@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   Hourglass,
@@ -16,8 +17,11 @@ import { RequestCard } from "@/components/RequestCard";
 import { columns, priorityTone, type Priority } from "@/lib/data";
 import { useWorkspace } from "@/lib/workspace";
 import { useAuth } from "@/lib/auth";
+import { listAppointments, loadSampleData } from "@/lib/workspace.functions";
 
 export const Route = createFileRoute("/")({
+  validateSearch: (search: Record<string, unknown>): { view?: "list" } =>
+    search["view"] === "list" ? { view: "list" } : {},
   head: () => ({
     meta: [
       { title: "Home — Banjg Property" },
@@ -29,17 +33,20 @@ export const Route = createFileRoute("/")({
   }),
   component: Dashboard,
 });
-const briefing = [
-  { id: "REQ-087", t: "Garage Door", why: "Waiting for landlord approval for 2 days" },
-  { id: "REQ-093", t: "Water Leak", why: "Tenant has provided requested photos; PM review needed" },
-  { id: "REQ-106", t: "Electrical Issue", why: "Electrician cancelled today's appointment" },
-];
-
 function Dashboard() {
-  const { requests, addRequest, notify } = useWorkspace();
+  const { requests, loaded, addRequest, notify } = useWorkspace();
+  const queryClient = useQueryClient();
+  const { data: appointments = [] } = useQuery({
+    queryKey: ["appointments"],
+    queryFn: () => listAppointments(),
+  });
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [view, setView] = useState<"board" | "list">("board");
+  const search = Route.useSearch();
+  const [view, setView] = useState<"board" | "list">(search.view === "list" ? "list" : "board");
+  useEffect(() => {
+    setView(search.view === "list" ? "list" : "board");
+  }, [search.view]);
   const [priority, setPriority] = useState<"All" | Priority>("All");
   const now = new Date();
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -66,6 +73,27 @@ function Dashboard() {
     () => (priority === "All" ? requests : requests.filter((item) => item.priority === priority)),
     [requests, priority],
   );
+  const attentionAll = useMemo(() => {
+    const weight = { Urgent: 0, High: 1, Medium: 2, Low: 3 } as const;
+    return requests
+      .filter(
+        (r) =>
+          r.column !== "Completed" &&
+          (r.column === "Action Needed" || r.priority === "Urgent" || r.priority === "High"),
+      )
+      .sort(
+        (a, b) =>
+          Number(b.column === "Action Needed") - Number(a.column === "Action Needed") ||
+          weight[a.priority] - weight[b.priority],
+      );
+  }, [requests]);
+  const briefing = attentionAll.slice(0, 3);
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const scheduledToday = appointments.filter(
+    (a) =>
+      a.startsAt >= startOfDay.getTime() && a.startsAt < startOfDay.getTime() + 24 * 3600 * 1000,
+  ).length;
   const stats = [
     {
       label: "Active Requests",
@@ -87,7 +115,7 @@ function Dashboard() {
     },
     {
       label: "Scheduled Today",
-      value: requests.filter((r) => r.column === "Scheduled").length,
+      value: scheduledToday,
       icon: CalendarCheck,
       tone: "text-scheduled bg-scheduled-soft",
     },
@@ -126,43 +154,80 @@ function Dashboard() {
             </div>
           ))}
         </div>
-        <section className="rounded-lg border bg-card p-4 shadow-card sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="grid h-8 w-8 place-items-center rounded-md bg-ai-soft text-ai">
-                <Bot className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-xs font-medium uppercase tracking-wide text-ai">
-                  Morning briefing
+        {requests.length > 0 ? (
+          <section className="rounded-lg border bg-card p-4 shadow-card sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="grid h-8 w-8 place-items-center rounded-md bg-ai-soft text-ai">
+                  <Bot className="h-4 w-4" />
                 </div>
-                <h2 className="font-semibold">3 requests need your attention</h2>
+                <div>
+                  <div className="text-xs font-medium uppercase tracking-wide text-ai">
+                    Morning briefing
+                  </div>
+                  <h2 className="font-semibold">
+                    {attentionAll.length === 0
+                      ? "Nothing needs your attention right now"
+                      : `${attentionAll.length} ${attentionAll.length === 1 ? "request needs" : "requests need"} your attention`}
+                  </h2>
+                </div>
               </div>
-            </div>
-            <button
-              onClick={() => setAiSeed((v) => v + 1)}
-              className="rounded-md border border-ai/30 bg-ai-soft px-3 py-2 text-sm font-medium text-ai hover:opacity-90"
-            >
-              Ask AI to prioritise my day
-            </button>
-          </div>
-          <div className="mt-4 divide-y rounded-md border">
-            {briefing.map((b) => (
-              <Link
-                key={b.id}
-                to="/requests/$id"
-                params={{ id: b.id }}
-                className="flex items-center gap-3 px-3 py-3 text-sm hover:bg-muted"
+              <button
+                onClick={() => setAiSeed((v) => v + 1)}
+                className="rounded-md border border-ai/30 bg-ai-soft px-3 py-2 text-sm font-medium text-ai hover:opacity-90"
               >
-                <span className="h-2 w-2 shrink-0 rounded-full bg-attention" />
-                <span className="font-mono text-xs text-muted-foreground">{b.id}</span>
-                <span className="hidden w-36 font-medium sm:block">{b.t}</span>
-                <span className="min-w-0 flex-1 truncate text-muted-foreground">{b.why}</span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </Link>
-            ))}
-          </div>
-        </section>
+                Ask AI to prioritise my day
+              </button>
+            </div>
+            <div className="mt-4 divide-y rounded-md border">
+              {briefing.map((b) => (
+                <Link
+                  key={b.id}
+                  to="/requests/$id"
+                  params={{ id: b.id }}
+                  className="flex items-center gap-3 px-3 py-3 text-sm hover:bg-muted"
+                >
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-attention" />
+                  <span className="font-mono text-xs text-muted-foreground">{b.id}</span>
+                  <span className="hidden w-36 truncate font-medium sm:block">{b.title}</span>
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                    {b.column === "Action Needed" ? "Action needed" : `${b.priority} priority`} ·{" "}
+                    {b.nextAction}
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
+        {loaded && requests.length === 0 ? (
+          <section className="rounded-lg border border-dashed bg-card p-8 text-center shadow-card">
+            <h2 className="text-lg font-semibold">No repair requests yet</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              Create your first request, or connect Gmail in the Inbox and create requests from
+              tenant emails. Want to look around first? Load a few clearly labelled sample requests.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <button
+                onClick={() => setNewOpen(true)}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              >
+                New request
+              </button>
+              <button
+                onClick={() =>
+                  void loadSampleData().then(() => {
+                    notify("Sample requests loaded");
+                    return queryClient.invalidateQueries({ queryKey: ["requests"] });
+                  })
+                }
+                className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
+              >
+                Load sample data
+              </button>
+            </div>
+          </section>
+        ) : null}
         <section>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-3">

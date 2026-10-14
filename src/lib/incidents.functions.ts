@@ -3,6 +3,8 @@ import { auth } from "@clerk/tanstack-react-start/server";
 import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
+  appointments,
+  requestQuotes,
   emailMessages,
   gmailAccounts,
   participantRoles,
@@ -84,7 +86,31 @@ export const getIncident = createServerFn({ method: "GET" })
           .limit(15)
       : [];
 
+    const quotes = await db
+      .select()
+      .from(requestQuotes)
+      .where(and(eq(requestQuotes.userId, userId), eq(requestQuotes.requestId, data.id)))
+      .orderBy(asc(requestQuotes.createdAt));
+    const bookings = await db
+      .select()
+      .from(appointments)
+      .where(and(eq(appointments.userId, userId), eq(appointments.requestId, data.id)))
+      .orderBy(asc(appointments.startsAt));
+
     return {
+      quotes: quotes.map((q) => ({
+        id: q.id,
+        supplier: q.supplier,
+        amount: q.amountCents / 100,
+        description: q.description,
+        status: q.status,
+      })),
+      appointments: bookings.map((b) => ({
+        id: b.id,
+        title: b.title,
+        startsAt: b.startsAt,
+        location: b.location,
+      })),
       gmailConnected: Boolean(account),
       participants: participants.map((p) => ({ role: p.role, name: p.name, email: p.email })),
       events: events.map((e) => ({

@@ -45,7 +45,7 @@ export const requestEvents = sqliteTable("request_events", {
   userId: text("user_id").notNull(),
   requestId: text("request_id").notNull(),
   at: integer("at").notNull(),
-  kind: text("kind", { enum: ["created", "status", "note"] }).notNull(),
+  kind: text("kind", { enum: ["created", "status", "note", "quote", "appointment"] }).notNull(),
   text: text("text").notNull(),
   actor: text("actor").notNull(),
 });
@@ -75,3 +75,32 @@ export const emailMessages = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.id] })],
 );
+
+export const properties = sqliteTable("properties", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: text("user_id").notNull(),
+  address: text("address").notNull(),
+  ownerName: text("owner_name").notNull().default(""),
+  ownerEmail: text("owner_email").notNull().default(""),
+  notes: text("notes").notNull().default(""),
+});
+
+export const requestQuotes = sqliteTable("request_quotes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: text("user_id").notNull(),
+  requestId: text("request_id").notNull(),
+  supplier: text("supplier").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  description: text("description").notNull().default(""),
+  status: text("status", { enum: ["Pending", "Approved", "Rejected"] }).notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const appointments = sqliteTable("appointments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: text("user_id").notNull(),
+  requestId: text("request_id"),
+  title: text("title").notNull(),
+  startsAt: integer("starts_at").notNull(),
+  location: text("location").notNull().default(""),
+});

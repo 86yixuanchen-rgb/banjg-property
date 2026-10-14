@@ -2,7 +2,17 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { emailMessages, gmailAccounts, repairRequests, requestParticipants } from "@/db/schema";
 import { getDb } from "./db.server";
 
-export const GMAIL_SCOPES = "openid email https://www.googleapis.com/auth/gmail.readonly";
+export const GMAIL_SCOPES =
+  "openid email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send";
+
+// Endpoints can be redirected (for example to a local fake Google server in tests).
+const GOOGLE_TOKEN_URL = () =>
+  process.env["GOOGLE_TOKEN_URL"] ?? "https://oauth2.googleapis.com/token";
+const GOOGLE_USERINFO_URL = () =>
+  process.env["GOOGLE_USERINFO_URL"] ?? "https://openidconnect.googleapis.com/v1/userinfo";
+const GMAIL_API = () => process.env["GMAIL_API_BASE"] ?? "https://gmail.googleapis.com";
+export const GOOGLE_AUTH_URL = () =>
+  process.env["GOOGLE_AUTH_URL"] ?? "https://accounts.google.com/o/oauth2/v2/auth";
 
 function env(name: string): string {
   const value = process.env[name];
@@ -50,7 +60,7 @@ async function decrypt(value: string) {
 
 export async function connectAccount(userId: string, code: string, origin: string) {
   const cfg = googleConfig(origin);
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  const res = await fetch(GOOGLE_TOKEN_URL(), {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -65,7 +75,7 @@ export async function connectAccount(userId: string, code: string, origin: strin
   const tokens = (await res.json()) as { access_token: string; refresh_token?: string };
   if (!tokens.refresh_token) throw new Error("Google did not return a refresh token");
 
-  const info = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+  const info = await fetch(GOOGLE_USERINFO_URL(), {
     headers: { Authorization: `Bearer ${tokens.access_token}` },
   });
   if (!info.ok) throw new Error(`Google userinfo failed (${info.status})`);
@@ -86,7 +96,7 @@ async function accessToken(userId: string, origin: string) {
   const [account] = await db.select().from(gmailAccounts).where(eq(gmailAccounts.userId, userId));
   if (!account) throw new ReconnectRequired("Gmail is not connected");
   const cfg = googleConfig(origin);
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  const res = await fetch(GOOGLE_TOKEN_URL(), {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -188,7 +198,7 @@ export async function syncInbox(userId: string, origin: string) {
   const token = await accessToken(userId, origin);
   const headers = { Authorization: `Bearer ${token}` };
   const list = await fetch(
-    "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=30&q=" +
+    `${GMAIL_API()}/gmail/v1/users/me/messages?maxResults=30&q=` +
       encodeURIComponent("(in:inbox OR in:sent) newer_than:30d"),
     { headers },
   );
@@ -197,10 +207,9 @@ export async function syncInbox(userId: string, origin: string) {
 
   const messages = await Promise.all(
     ids.map(async ({ id }) => {
-      const res = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
-        { headers },
-      );
+      const res = await fetch(`${GMAIL_API()}/gmail/v1/users/me/messages/${id}?format=full`, {
+        headers,
+      });
       return res.ok ? ((await res.json()) as GmailMessage) : null;
     }),
   );
@@ -221,11 +230,108 @@ export async function syncInbox(userId: string, origin: string) {
     .update(gmailAccounts)
     .set({ lastSyncAt: Date.now() })
     .where(eq(gmailAccounts.userId, userId));
+  await autoLinkEmails(userId);
   return messages.filter(Boolean).length;
+}
+
+// Links unlinked emails to the request whose participant is the other party in the conversation.
+export async function autoLinkEmails(userId: string) {
+  const db = await getDb();
+  const [account] = await db.select().from(gmailAccounts).where(eq(gmailAccounts.userId, userId));
+  const own = account?.email.toLowerCase() ?? "";
+  const people = await db
+    .select()
+    .from(requestParticipants)
+    .where(eq(requestParticipants.userId, userId));
+  if (people.length === 0) return;
+  const requests = await db
+    .select({ id: repairRequests.id, column: repairRequests.boardColumn })
+    .from(repairRequests)
+    .where(eq(repairRequests.userId, userId))
+    .orderBy(desc(repairRequests.sortOrder));
+  const open = new Set(requests.filter((r) => r.column !== "Completed").map((r) => r.id));
+
+  const unlinked = await db
+    .select()
+    .from(emailMessages)
+    .where(and(eq(emailMessages.userId, userId), isNull(emailMessages.requestId)));
+  for (const mail of unlinked) {
+    const addresses = [mail.fromEmail, ...mail.toEmails.split(",")]
+      .map((a) => a.trim().toLowerCase())
+      .filter((a) => a && a !== own);
+    const matches = people.filter((p) => addresses.includes(p.email.toLowerCase()));
+    const target = matches.find((p) => open.has(p.requestId)) ?? matches[0];
+    if (!target) continue;
+    await db
+      .update(emailMessages)
+      .set({ requestId: target.requestId })
+      .where(and(eq(emailMessages.userId, userId), eq(emailMessages.id, mail.id)));
+  }
 }
 
 export async function disconnectAccount(userId: string) {
   const db = await getDb();
   await db.delete(emailMessages).where(eq(emailMessages.userId, userId));
   await db.delete(gmailAccounts).where(eq(gmailAccounts.userId, userId));
+}
+
+const cleanHeader = (value: string) => value.replace(/[\r\n]+/g, " ").trim();
+
+export async function sendMail(
+  userId: string,
+  origin: string,
+  input: { to: string; subject: string; body: string; requestId: string | null; threadId?: string },
+) {
+  const token = await accessToken(userId, origin);
+  const db = await getDb();
+  const [account] = await db.select().from(gmailAccounts).where(eq(gmailAccounts.userId, userId));
+  if (!account) throw new ReconnectRequired("Gmail is not connected");
+
+  const to = cleanHeader(input.to);
+  const subject = cleanHeader(input.subject);
+  const encodedSubject = /^[\x20-\x7e]*$/.test(subject)
+    ? subject
+    : `=?UTF-8?B?${b64(new TextEncoder().encode(subject))}?=`;
+  const bodyB64 = (b64(new TextEncoder().encode(input.body)).match(/.{1,76}/g) ?? []).join("\r\n");
+  const mime = [
+    `To: ${to}`,
+    `Subject: ${encodedSubject}`,
+    "MIME-Version: 1.0",
+    'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    bodyB64,
+  ].join("\r\n");
+  const raw = b64(new TextEncoder().encode(mime))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  const res = await fetch(`${GMAIL_API()}/gmail/v1/users/me/messages/send`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ raw, ...(input.threadId ? { threadId: input.threadId } : {}) }),
+  });
+  if (res.status === 403) throw new ReconnectRequired("Gmail send permission is missing");
+  if (!res.ok) throw new Error(`Gmail send failed (${res.status})`);
+  const sent = (await res.json()) as { id: string; threadId?: string };
+
+  await db
+    .insert(emailMessages)
+    .values({
+      userId,
+      id: sent.id,
+      threadId: sent.threadId ?? sent.id,
+      fromName: "You",
+      fromEmail: account.email.toLowerCase(),
+      toEmails: to.toLowerCase(),
+      subject,
+      snippet: input.body.slice(0, 300),
+      body: input.body.slice(0, 20000),
+      receivedAt: Date.now(),
+      unread: false,
+      requestId: input.requestId,
+    })
+    .onConflictDoNothing();
+  if (!input.requestId) await autoLinkEmails(userId);
 }

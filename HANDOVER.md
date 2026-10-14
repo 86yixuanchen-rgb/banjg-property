@@ -253,13 +253,13 @@ The Inbox page can connect the user's own Gmail and read-only syncs up to 30 ema
 
 **Environment variables**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`). In production set them with `wrangler secret put`; locally put them in `.env.local`.
 
-**Google Cloud setup**: enable the Gmail API → OAuth consent screen (External, Testing) → add scope `gmail.readonly` → add each user's Gmail address as a Test user → create an OAuth Client of type Web application and add `https://<deployed-domain>/api/gmail/callback` and `http://localhost:8080/api/gmail/callback` as Authorized redirect URIs.
+**Google Cloud setup**: enable the Gmail API → OAuth consent screen (External, Testing) → add scopes `gmail.readonly` and `gmail.send` → add each user's Gmail address as a Test user → create an OAuth Client of type Web application and add `https://<deployed-domain>/api/gmail/callback` and `http://localhost:8080/api/gmail/callback` as Authorized redirect URIs.
 
 **Known limitations**:
 - In Testing mode the authorization expires after 7 days; click Connect Gmail in the Inbox again. Up to 100 test users. The consent screen shows an "unverified app" warning.
 - Opening this to the public requires Google's review for the restricted scope `gmail.readonly` (possibly a CASA security assessment).
-- Read-only: replies cannot be sent from the app. The Reply button opens the local email client (mailto).
-- Emails are display-only for now. You can manually use "Create repair request from this email"; DeepSeek classification and automatic linking to requests are not implemented.
+- Sending: the app requests `gmail.send` as well as `gmail.readonly`. Replies (Inbox) and reminders (request page) are sent from the user's own Gmail. Accounts connected before this scope existed must reconnect (the UI says so).
+- New emails do not create requests automatically; use "Create repair request from this email" or add the sender to a request.
 - Sync runs when you click Sync or open the Inbox; there is no scheduled job (a Cron Trigger could be added later).
 
 ---
@@ -280,6 +280,10 @@ Each repair request is an "incident". The Dashboard shows all of them (Board vie
 4. Emails from unknown senders show "Add <address> as Tenant / Landlord / Repair Team" in the timeline.
 
 **AI details**: `analyzeIncident` in `src/lib/incidents.functions.ts`. It runs automatically when the incident has emails and the analysis is missing or older than the newest email or event; otherwise use Generate / Regenerate. The prompt marks email text as untrusted data, the reply is validated with Zod, and nothing is sent or changed without the user applying it.
+
+**Automated tests** (`npm test`): `src/test/gmail-incident.integration.test.ts` runs the real sync, participant linking, token encryption, sending (UTF-8, header-injection safety, threading) and reconnect handling against a real local D1, with only Google's HTTP endpoints stubbed. Google endpoints can also be redirected with `GOOGLE_AUTH_URL`, `GOOGLE_TOKEN_URL`, `GOOGLE_USERINFO_URL` and `GMAIL_API_BASE` (unset in production).
+
+**Real data everywhere (no demo content)**: Properties, Contacts, Calendar, Analytics, Settings, the Morning Briefing and Dashboard stats are computed from the database (`lib/workspace.functions.ts`). Quotes (`request_quotes`) and appointments are stored per request. New accounts start empty; the dashboard offers an explicit "Load sample data" button. Integrations that do not exist yet (Instagram, WhatsApp, Teams, Slack, PropertyMe, AppFolio) are listed as "Coming soon" in Settings.
 
 **Not yet verified end to end**: the full flow with a signed-in Clerk session and a real mailbox (type checks, lint, build and the local migration pass; the sign-in step cannot be automated here because of Clerk bot protection).
 
@@ -369,7 +373,7 @@ Found during code review, ordered by severity:
 
 ### P1 — near term
 
-- [ ] **Remove the hard-coded PM name**: replace "Sarah Miller" with the real user name from `useAuth()` (`requests.$id.tsx`, `inbox.tsx`)
+- [x] ~~**Remove the hard-coded PM name**~~ → done
 - [ ] **Make Morning Briefing dynamic**: pick items needing attention from real requests instead of the hard-coded array in `index.tsx`
 - [ ] **Extend the request data model**: add `tenantName`, `landlordName`, `tradeName`, `photos` and `timeline` to each request instead of inferring from `waitingOn`
 - [ ] **File uploads**: tenants uploading repair photos

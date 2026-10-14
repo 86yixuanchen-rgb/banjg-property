@@ -26,7 +26,7 @@ import { useAuth } from "@/lib/auth";
 const nav = [
   { label: "Home", icon: Home, to: "/" as const },
   { label: "Unified Inbox", icon: Inbox, to: "/inbox" as const, badge: 3 },
-  { label: "Requests", icon: ClipboardList, to: "/" as const },
+  { label: "Requests", icon: ClipboardList, to: "/" as const, view: "list" as const },
   {
     label: "Properties",
     icon: Building2,
@@ -112,8 +112,7 @@ export function AppShell({
       requests
         .filter(
           (r) =>
-            r.column === "Action Needed" ||
-            (r.column === "Waiting" && r.waiting.includes("day")),
+            r.column === "Action Needed" || (r.column === "Waiting" && r.waiting.includes("day")),
         )
         .slice(0, 5),
     [requests],
@@ -125,7 +124,12 @@ export function AppShell({
   };
 
   if (!ready || !isSignedIn) {
-    return <div className="grid min-h-screen place-items-center bg-background" aria-label="Loading workspace" />;
+    return (
+      <div
+        className="grid min-h-screen place-items-center bg-background"
+        aria-label="Loading workspace"
+      />
+    );
   }
 
   const sidebar = (
@@ -150,9 +154,10 @@ export function AppShell({
               key={n.label}
               to={n.to}
               {...("section" in n ? { params: { section: n.section } } : {})}
+              {...("view" in n ? { search: { view: n.view } } : {})}
               onClick={() => setMobileNav(false)}
               className={cls}
-              activeOptions={{ exact: n.label === "Home" }}
+              activeOptions={{ exact: n.to === "/", includeSearch: n.to === "/" }}
               activeProps={{ className: "bg-sidebar-accent font-medium text-primary" }}
             >
               {inner}
@@ -175,7 +180,7 @@ export function AppShell({
         </button>
         <Link to="/" className="flex items-center gap-2 md:w-52">
           <div className="grid h-8 w-8 place-items-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
-            K
+            B
           </div>
           <span className="hidden font-semibold tracking-tight sm:inline">
             Banjg <span className="font-normal text-muted-foreground">Property</span>
