@@ -13,7 +13,12 @@ export const Route = createFileRoute("/api/gmail/connect")({
         const url = new URL(request.url);
         if (!userId) return redirect(`${url.origin}/login`);
 
-        const cfg = googleConfig(url.origin);
+        let cfg: ReturnType<typeof googleConfig>;
+        try {
+          cfg = googleConfig(url.origin);
+        } catch {
+          return redirect(`${url.origin}/inbox?gmail=error`);
+        }
         const state = crypto.randomUUID();
         const params = new URLSearchParams({
           client_id: cfg.clientId,
