@@ -115,7 +115,7 @@ src/
 │   ├── RequestCard.tsx       # Kanban card component
 │   └── ui/                   # shadcn/ui primitives (do not edit by hand)
 ├── db/
-│   └── schema.ts             # Drizzle schema (repair_requests, gmail_accounts, email_messages)
+│   └── schema.ts             # Drizzle schema (repair_requests, request_participants, request_events, gmail_accounts, email_messages)
 ├── lib/
 │   ├── auth.tsx              # Clerk wrapper (useAuth hook with a stable API)
 │   ├── data.ts               # Seed data: RepairRequest, Column, Priority types
@@ -123,6 +123,7 @@ src/
 │   ├── deepseek.ts           # DeepSeek server function (TanStack Start server fn)
 │   ├── gmail.server.ts       # Gmail OAuth, token encryption, mailbox sync (server only)
 │   ├── gmail.functions.ts    # getInbox / syncGmail / disconnectGmail server functions
+│   ├── incidents.functions.ts # Incident detail, participants, email linking, notes, AI analysis
 │   ├── requests.functions.ts # listRequests / createRequest / patchRequest server functions
 │   ├── workspace.tsx         # Global state context: requests, toast notifications
 │   └── utils.ts              # cn() helper
@@ -147,7 +148,7 @@ Repair requests are stored in the `repair_requests` table in Cloudflare D1 (sche
 
 Data flow: `WorkspaceProvider` (`lib/workspace.tsx`) reads with TanStack Query → server functions (`lib/requests.functions.ts`: `listRequests` / `createRequest` / `patchRequest`) → `getDb()` in `lib/db.server.ts`. On a new user's first sign-in, `listRequests` copies the demo data from `src/lib/data.ts` into their account. Writes are optimistic; on failure the user is notified and the data is refetched.
 
-Persisted tables: `repair_requests`, plus `gmail_accounts` and `email_messages` for the Gmail integration. Demo inbox messages, detail-page notes, contacts and properties are still hard-coded or held in component state (see section 9).
+Persisted tables: `repair_requests`, `request_participants`, `request_events`, `gmail_accounts` and `email_messages` (see sections 7.5 and 7.6). Demo inbox messages, detail-page notes, contacts and properties are still hard-coded or held in component state (see section 9).
 
 Schema change workflow:
 
@@ -239,7 +240,7 @@ AssistantPanel (client) → askDeepSeek (server function) → DeepSeek API → a
 
 ## 7.5. Gmail integration (Testing mode)
 
-The Inbox page can connect the user's own Gmail and read-only syncs up to 25 emails from the last 30 days of the inbox.
+The Inbox page can connect the user's own Gmail and read-only syncs up to 30 emails from the last 30 days of the inbox and sent mail.
 
 **Flow**: `/api/gmail/connect` (redirects to Google consent) → `/api/gmail/callback` (exchanges the code; the refresh token is AES-GCM encrypted and stored in D1 `gmail_accounts`) → Inbox calls `syncGmail`, which stores emails in `email_messages`. When Gmail is not connected, the Inbox shows demo data.
 
@@ -260,6 +261,27 @@ The Inbox page can connect the user's own Gmail and read-only syncs up to 25 ema
 - Read-only: replies cannot be sent from the app. The Reply button opens the local email client (mailto).
 - Emails are display-only for now. You can manually use "Create repair request from this email"; DeepSeek classification and automatic linking to requests are not implemented.
 - Sync runs when you click Sync or open the Inbox; there is no scheduled job (a Cron Trigger could be added later).
+
+---
+
+## 7.6. Incident view (request detail, emails and AI next step)
+
+Each repair request is an "incident". The Dashboard shows all of them (Board view, or the **All events** list). Opening one shows:
+
+- **Progress line**: the five stages (New → Waiting → Action Needed → Scheduled → Completed) with the current one highlighted. Clicking a stage moves the request.
+- **People involved**: Tenant, Landlord and Repair Team, each with name and email (`request_participants`), plus the signed-in property manager.
+- **Activity timeline**: real emails (received and sent), status changes, notes and the creation event in one chronological list (`request_events`, `email_messages`). Emails can be expanded to read the full text.
+- **AI suggested next step**: DeepSeek reads the request, people, events and linked emails and returns a summary, a next step, a suggested board column and who we are waiting on. It is stored on the request (`ai_*` columns) and only applied when the user clicks **Apply to request**.
+
+**How emails get linked to an incident**
+1. Automatically: after each Gmail sync (inbox and sent, last 30 days), an email is linked to the request whose participant is the other party (sender, or recipient for sent mail). Open requests win over completed ones (`autoLinkEmails` in `gmail.server.ts`).
+2. When a person is added to a request, earlier unlinked emails with that address are linked straight away (`addParticipant`).
+3. Manually: "Link an existing email" on the detail page, or "Create repair request from this email" in the Inbox (links that email).
+4. Emails from unknown senders show "Add <address> as Tenant / Landlord / Repair Team" in the timeline.
+
+**AI details**: `analyzeIncident` in `src/lib/incidents.functions.ts`. It runs automatically when the incident has emails and the analysis is missing or older than the newest email or event; otherwise use Generate / Regenerate. The prompt marks email text as untrusted data, the reply is validated with Zod, and nothing is sent or changed without the user applying it.
+
+**Not yet verified end to end**: the full flow with a signed-in Clerk session and a real mailbox (type checks, lint, build and the local migration pass; the sign-in step cannot be automated here because of Clerk bot protection).
 
 ---
 
@@ -305,6 +327,7 @@ The Inbox page can connect the user's own Gmail and read-only syncs up to 25 ema
 |--------|-------|
 | Repair requests persisted in Cloudflare D1 via Drizzle | `db/schema.ts`, `lib/requests.functions.ts` |
 | Read-only Gmail integration for the Unified Inbox | `lib/gmail.*.ts`, `routes/api.gmail.*.ts`, `routes/inbox.tsx` |
+| Incident view: progress line, people, real email timeline, AI next step, All events list | `lib/incidents.functions.ts`, `routes/requests.$id.tsx`, `routes/index.tsx` |
 
 ---
 

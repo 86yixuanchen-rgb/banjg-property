@@ -1,5 +1,5 @@
-import { eq } from "drizzle-orm";
-import { emailMessages, gmailAccounts } from "@/db/schema";
+import { and, desc, eq, isNull } from "drizzle-orm";
+import { emailMessages, gmailAccounts, repairRequests, requestParticipants } from "@/db/schema";
 import { getDb } from "./db.server";
 
 export const GMAIL_SCOPES = "openid email https://www.googleapis.com/auth/gmail.readonly";
@@ -160,6 +160,9 @@ function parseMessage(userId: string, m: GmailMessage) {
   const match = from.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
   const fromEmail = (match?.[2] ?? from).trim();
   const fromName = (match?.[1] ?? "").trim() || fromEmail;
+  const toEmails = (header("to").match(/[^\s<>,"]+@[^\s<>,"]+/g) ?? [])
+    .map((e) => e.toLowerCase())
+    .join(",");
   const text = findPart(m.payload, "text/plain");
   const html = findPart(m.payload, "text/html");
   const body = (text ?? (html ? htmlToText(html) : decodeEntities(m.snippet ?? ""))).slice(
@@ -171,7 +174,8 @@ function parseMessage(userId: string, m: GmailMessage) {
     id: m.id,
     threadId: m.threadId,
     fromName,
-    fromEmail,
+    fromEmail: fromEmail.toLowerCase(),
+    toEmails,
     subject: header("subject") || "(no subject)",
     snippet: decodeEntities(m.snippet ?? "").slice(0, 300),
     body,
@@ -184,8 +188,8 @@ export async function syncInbox(userId: string, origin: string) {
   const token = await accessToken(userId, origin);
   const headers = { Authorization: `Bearer ${token}` };
   const list = await fetch(
-    "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&q=" +
-      encodeURIComponent("in:inbox newer_than:30d"),
+    "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=30&q=" +
+      encodeURIComponent("(in:inbox OR in:sent) newer_than:30d"),
     { headers },
   );
   if (!list.ok) throw new Error(`Gmail list failed (${list.status})`);
