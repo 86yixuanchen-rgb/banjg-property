@@ -15,6 +15,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { useAuth } from "@/lib/auth";
 import { useWorkspace } from "@/lib/workspace";
 import { disconnectGmail, getInbox, syncGmail, type InboxEmail } from "@/lib/gmail.functions";
 import { linkEmail } from "@/lib/incidents.functions";
@@ -167,6 +168,8 @@ function getActionsForMessage(msg: Msg): string[] {
 }
 
 function InboxPage() {
+  const { user } = useAuth();
+  const managerName = user?.name || "Property Manager";
   const [ch, setCh] = useState<string>("All");
   const [query, setQuery] = useState("");
   const [demo, setDemo] = useState<Msg[]>(demoMessages);
@@ -373,7 +376,7 @@ function InboxPage() {
                   <div className="text-sm">
                     <div className="font-medium">{selected.from}</div>
                     <div className="text-xs text-muted-foreground">
-                      {selected.gmail ? selected.role : `${selected.role} · to Sarah Miller`}
+                      {selected.gmail ? selected.role : `${selected.role} · to ${managerName}`}
                     </div>
                   </div>
                 </div>
