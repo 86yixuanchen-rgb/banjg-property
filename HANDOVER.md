@@ -1,64 +1,63 @@
-# Banjg Property — 项目交接文档
+# Banjg Property — Project Handover
 
-**更新日期**：2026-10-09  
-**维护者**：86yixuanchen-rgb  
-**仓库**：[github.com/86yixuanchen-rgb/banjg-property](https://github.com/86yixuanchen-rgb/banjg-property)
-
----
-
-## 一、项目概述
-
-Banjg Property 是一款面向澳洲物业经理的 **AI 辅助维修协调工具**，核心功能是：
-
-- 统一管理租户、房东、承包商三方的维修请求
-- 看板式工作流（New → Waiting → Action Needed → Scheduled → Completed）
-- 跨渠道统一收件箱（Email / SMS / Teams / Chat）
-- AI 助手（DeepSeek）对请求进行分析并提供建议操作
-- 物业、联系人、日历、分析等工作区模块
+**Last updated**: 2026-10-14
+**Repository**: [github.com/gracethecoderr/3605assessment](https://github.com/gracethecoderr/3605assessment)
 
 ---
 
-## 二、技术栈
+## 1. Overview
 
-| 层次 | 技术 |
-|------|------|
-| 框架 | [TanStack Start](https://tanstack.com/start) 1.x（SSR + 文件路由） |
+Banjg Property is an **AI-assisted repair coordination tool** for Australian property managers. Core features:
+
+- Manage repair requests across tenants, landlords and trades in one place
+- Kanban workflow (New → Waiting → Action Needed → Scheduled → Completed)
+- Unified inbox across channels (Email / SMS / Teams / Chat)
+- AI assistant (DeepSeek) that analyses requests and suggests next actions
+- Workspace modules: Properties, Contacts, Calendar, Analytics, Settings
+
+---
+
+## 2. Tech stack
+
+| Layer | Technology |
+|-------|------------|
+| Framework | [TanStack Start](https://tanstack.com/start) 1.x (SSR + file-based routing) |
 | UI | React 19 + TypeScript 5.8 |
-| 样式 | Tailwind CSS v4 + shadcn/ui（Radix UI） |
-| 路由 | TanStack Router（自动生成 `routeTree.gen.ts`） |
-| 数据请求 | TanStack Query v5 |
-| 表单 | React Hook Form + Zod |
-| 认证 | [Clerk](https://clerk.com)（`@clerk/tanstack-react-start` 1.7.x） |
-| 数据库 | [Cloudflare D1](https://developers.cloudflare.com/d1/)（SQLite）+ Drizzle ORM |
-| AI | DeepSeek API（`deepseek-chat` 模型） |
-| 构建 | Vite 8 + Rolldown，Nitro `cloudflare-module` preset（部署到 Cloudflare Workers） |
-| 测试 | Vitest + Testing Library |
+| Styling | Tailwind CSS v4 + shadcn/ui (Radix UI) |
+| Routing | TanStack Router (auto-generated `routeTree.gen.ts`) |
+| Data fetching | TanStack Query v5 |
+| Forms | React Hook Form + Zod |
+| Auth | [Clerk](https://clerk.com) (`@clerk/tanstack-react-start` 1.7.x) |
+| Database | [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite) + Drizzle ORM |
+| AI | DeepSeek API (`deepseek-chat` model) |
+| Build | Vite 8 + Rolldown, Nitro `cloudflare-module` preset (deploys to Cloudflare Workers) |
+| Testing | Vitest + Testing Library |
 
 ---
 
-## 三、本地开发
+## 3. Local development
 
-### 环境要求
+### Requirements
 
-- Node.js ≥ 20
-- npm（锁文件为 `package-lock.json`）
+- Node.js >= 20
+- npm (lockfile is `package-lock.json`)
 
-### 启动步骤
+### Setup
 
 ```bash
-git clone https://github.com/86yixuanchen-rgb/banjg-property.git
-cd banjg-property
+git clone https://github.com/gracethecoderr/3605assessment.git
+cd 3605assessment
 npm install
 ```
 
-复制环境变量模板并填入真实 key：
+Copy the environment template and fill in real keys:
 
 ```bash
 cp .env.example .env.local
-# 编辑 .env.local，填入 Clerk 和 DeepSeek 的 key
+# Edit .env.local and add your Clerk and DeepSeek keys
 ```
 
-初始化本地 D1 数据库（首次或新增迁移后执行；数据保存在 `.wrangler/state`，已被 gitignore）：
+Initialise the local D1 database (run once, and again after any new migration; data is stored in `.wrangler/state`, which is gitignored):
 
 ```bash
 npx wrangler d1 migrations apply DB --local
@@ -68,84 +67,97 @@ npx wrangler d1 migrations apply DB --local
 npm run dev
 ```
 
-开发模式下，`src/lib/db.server.ts` 通过 wrangler 的 `getPlatformProxy` 读写上面的本地 D1。浏览器访问 `http://localhost:8080`（Vite 默认端口 8080），用真实邮箱通过 Clerk Email OTP 登录或注册。
+In dev mode, `src/lib/db.server.ts` reads and writes the local D1 above through wrangler's `getPlatformProxy`. Open `http://localhost:8080` (Vite's port in this project) and sign in or sign up with a real email through Clerk Email OTP.
 
-### 可用命令
+### Commands
 
-| 命令 | 说明 |
-|------|------|
-| `npm run dev` | 启动开发服务器 |
-| `npm run build` | 生产构建 |
-| `npm run preview` | 预览生产包 |
-| `npm run test` | 运行测试 |
-| `npm run lint` | ESLint 检查 |
-| `npm run format` | Prettier 格式化 |
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start the dev server |
+| `npm run build` | Production build |
+| `npm run preview` | Preview the production build |
+| `npm run test` | Run tests |
+| `npm run lint` | ESLint |
+| `npm run format` | Prettier |
 
-### 环境变量
+### Environment variables
 
-在项目根目录创建 `.env.local`（参考 `.env.example`）：
+Create `.env.local` in the project root (see `.env.example`):
 
 ```env
-# Clerk 认证（必填）— 从 https://dashboard.clerk.com 获取
+# Clerk auth (required) — get keys from https://dashboard.clerk.com
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxxxxxxxxx
 CLERK_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxxxx
 
-# DeepSeek AI 助手（可选，未配置时 AI 面板显示提示）
+# DeepSeek AI assistant (optional; the AI panel shows a notice when unset)
 DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxx
+
+# Gmail integration (optional; see section 7.5)
+GOOGLE_CLIENT_ID=xxxxxxxxxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxx
+TOKEN_ENCRYPTION_KEY=   # openssl rand -base64 32
 ```
 
-**获取 Clerk Key 的步骤：**
-1. 登录 [dashboard.clerk.com](https://dashboard.clerk.com)
-2. 创建新应用，选择"Email code"作为认证方式
-3. 在 API Keys 页面复制 Publishable Key 和 Secret Key
+**Getting Clerk keys:**
+1. Sign in at [dashboard.clerk.com](https://dashboard.clerk.com)
+2. Create a new application and choose "Email code" as the sign-in method
+3. Copy the Publishable Key and Secret Key from the API Keys page
 
 ---
 
-## 四、项目结构
+## 4. Project structure
 
 ```
 src/
 ├── components/
-│   ├── AppShell.tsx          # 全局布局：侧边栏、顶部导航、通知、AI 浮动按钮
-│   ├── AssistantPanel.tsx    # AI 对话面板（调用 DeepSeek 服务端函数）
-│   ├── RequestCard.tsx       # 看板卡片组件（支持拖拽状态更改）
-│   └── ui/                   # shadcn/ui 基础组件库（不要手动修改）
+│   ├── AppShell.tsx          # Global layout: sidebar, top bar, notifications, AI floating button
+│   ├── AssistantPanel.tsx    # AI chat panel (calls the DeepSeek server function)
+│   ├── RequestCard.tsx       # Kanban card component
+│   └── ui/                   # shadcn/ui primitives (do not edit by hand)
+├── db/
+│   └── schema.ts             # Drizzle schema (repair_requests, gmail_accounts, email_messages)
 ├── lib/
-│   ├── auth.tsx              # Clerk 认证封装（useAuth hook，维持统一 API）
-│   ├── data.ts               # 种子数据：RepairRequest、Column、Priority 类型
-│   ├── deepseek.ts           # DeepSeek 服务端函数（TanStack Start server fn）
-│   ├── workspace.tsx         # 全局状态 Context：请求列表、toast 通知
-│   └── utils.ts              # cn() 工具函数
+│   ├── auth.tsx              # Clerk wrapper (useAuth hook with a stable API)
+│   ├── data.ts               # Seed data: RepairRequest, Column, Priority types
+│   ├── db.server.ts          # getDb(): D1 access (Workers binding, or wrangler proxy in dev)
+│   ├── deepseek.ts           # DeepSeek server function (TanStack Start server fn)
+│   ├── gmail.server.ts       # Gmail OAuth, token encryption, mailbox sync (server only)
+│   ├── gmail.functions.ts    # getInbox / syncGmail / disconnectGmail server functions
+│   ├── requests.functions.ts # listRequests / createRequest / patchRequest server functions
+│   ├── workspace.tsx         # Global state context: requests, toast notifications
+│   └── utils.ts              # cn() helper
 ├── routes/
-│   ├── __root.tsx            # 根路由：ClerkProvider、QueryClientProvider、SEO head
-│   ├── index.tsx             # 主仪表盘：统计、AI Briefing、看板
-│   ├── login.tsx             # 登录页（Clerk 预制 <SignIn withSignUp /> 组件）
-│   ├── inbox.tsx             # 统一收件箱
-│   ├── requests.$id.tsx      # 维修请求详情页
-│   └── workspace.$section.tsx # 工作区（Properties / Contacts / Calendar / Analytics / Settings）
-├── start.ts                  # TanStack Start 实例（含 clerkMiddleware）
-└── styles.css                # Tailwind 全局样式 + 设计 token
+│   ├── __root.tsx            # Root route: ClerkProvider, QueryClientProvider, SEO head
+│   ├── index.tsx             # Main dashboard: stats, AI briefing, kanban
+│   ├── login.tsx             # Sign-in page (Clerk <SignIn withSignUp /> component)
+│   ├── inbox.tsx             # Unified inbox
+│   ├── api.gmail.connect.ts  # Starts the Gmail OAuth flow
+│   ├── api.gmail.callback.ts # Gmail OAuth callback
+│   ├── requests.$id.tsx      # Repair request detail page
+│   └── workspace.$section.tsx # Workspace (Properties / Contacts / Calendar / Analytics / Settings)
+├── start.ts                  # TanStack Start instance (includes clerkMiddleware)
+└── styles.css                # Tailwind global styles + design tokens
 ```
 
 ---
 
-## 五、数据模型
+## 5. Data model
 
-维修请求存储在 Cloudflare D1 的 `repair_requests` 表中（schema：`src/db/schema.ts`，迁移：`drizzle/`），按 Clerk `userId` 隔离，主键为 `(user_id, id)`。
+Repair requests are stored in the `repair_requests` table in Cloudflare D1 (schema: `src/db/schema.ts`, migrations: `drizzle/`), isolated per Clerk `userId`, with primary key `(user_id, id)`.
 
-数据流：`WorkspaceProvider`（`lib/workspace.tsx`）用 TanStack Query 读取 → server function（`lib/requests.functions.ts`：`listRequests` / `createRequest` / `patchRequest`）→ `lib/db.server.ts` 的 `getDb()`。新用户首次登录时，`listRequests` 会把 `src/lib/data.ts` 里的 demo 数据写入其账户。写操作是乐观更新，失败时提示并重新拉取。
+Data flow: `WorkspaceProvider` (`lib/workspace.tsx`) reads with TanStack Query → server functions (`lib/requests.functions.ts`: `listRequests` / `createRequest` / `patchRequest`) → `getDb()` in `lib/db.server.ts`. On a new user's first sign-in, `listRequests` copies the demo data from `src/lib/data.ts` into their account. Writes are optimistic; on failure the user is notified and the data is refetched.
 
-目前只有 `repair_requests` 落库；Inbox 消息、详情页备注、联系人/物业仍是前端硬编码或组件内状态（见第九节）。
+Persisted tables: `repair_requests`, plus `gmail_accounts` and `email_messages` for the Gmail integration. Demo inbox messages, detail-page notes, contacts and properties are still hard-coded or held in component state (see section 9).
 
-修改 schema 的流程：
+Schema change workflow:
 
 ```bash
-npx drizzle-kit generate                      # 生成新的 SQL 迁移
-npx wrangler d1 migrations apply DB --local   # 应用到本地
-npx wrangler d1 migrations apply DB --remote  # 应用到线上（Cloudflare 账号 86yixuanchen@gmail.com）
+npx drizzle-kit generate                      # generate a new SQL migration
+npx wrangler d1 migrations apply DB --local   # apply locally
+npx wrangler d1 migrations apply DB --remote  # apply to the deployed database
 ```
 
-线上数据库：`banjg-property-db`，ID `6517c9ef-deb9-4d5a-8a58-455235489aae`，binding 名 `DB`（见 `wrangler.jsonc`）。
+Production database: `banjg-property-db`, ID `6517c9ef-deb9-4d5a-8a58-455235489aae`, binding name `DB` (see `wrangler.jsonc`).
 
 ```typescript
 interface RepairRequest {
@@ -154,226 +166,229 @@ interface RepairRequest {
   address: string;     // "3/22 Oxford St, Paddington"
   priority: "Urgent" | "High" | "Medium" | "Low";
   column: "New" | "Waiting" | "Action Needed" | "Scheduled" | "Completed";
-  status: string;      // 当前状态描述
+  status: string;      // Current status description
   waitingOn: string;   // "Landlord · David Chen" | "Tenant · Mia Russo" | ...
-  nextAction: string;  // 下一步操作提示
-  waiting: string;     // 等待时长
-  lastUpdate: string;  // 最后更新时间
+  nextAction: string;  // Suggested next step
+  waiting: string;     // How long it has been waiting
+  lastUpdate: string;  // Last update time
 }
 ```
 
-`waitingOn` 字段格式约定：`"<角色> · <姓名>"`（中点分隔），详情页会解析此字段以动态渲染 Stakeholders 面板和时间线。
+Convention for `waitingOn`: `"<Role> · <Name>"` (middle-dot separated). The detail page parses this field to render the Stakeholders panel and timeline.
 
 ---
 
-## 六、认证说明（Clerk Email OTP）
+## 6. Authentication (Clerk Email OTP)
 
-认证由 [Clerk](https://clerk.com) 提供，使用 `@clerk/tanstack-react-start` 1.7.x。
+Authentication is provided by [Clerk](https://clerk.com) using `@clerk/tanstack-react-start` 1.7.x.
 
-### 架构
+### Architecture
 
 ```
-ClerkProvider（__root.tsx）
+ClerkProvider (__root.tsx)
     ↓
-clerkMiddleware()（start.ts，服务端）
+clerkMiddleware() (start.ts, server side)
     ↓
-useAuth()（auth.tsx 封装）→ 所有页面通过此 hook 读取用户信息
+useAuth() (auth.tsx wrapper) → every page reads the user through this hook
 ```
 
-### 登录 / 注册流程
+### Sign-in / sign-up flow
 
-登录页使用 Clerk 预制 `<SignIn withSignUp />` 组件，自动处理：
+The login page uses Clerk's pre-built `<SignIn withSignUp />` component, which handles:
 
-- 邮箱 OTP 登录（已有账号）
-- 邮箱 OTP 注册（新账号，`withSignUp` 启用）
-- Google OAuth（若在 Clerk Dashboard 配置）
-- Bot Protection / CAPTCHA
-- Session 创建与激活
-- 登录后跳转 `/`（`forceRedirectUrl="/"`)
+- Email OTP sign-in (existing accounts)
+- Email OTP sign-up (new accounts, enabled by `withSignUp`)
+- Google OAuth (if configured in the Clerk Dashboard)
+- Bot protection / CAPTCHA
+- Session creation and activation
+- Redirect to `/` after sign-in (`forceRedirectUrl="/"`)
 
-无需手动调用 signal API。Clerk 组件内部自动完成所有流程。
+There is no need to call the Clerk signal API by hand; the component runs the whole flow.
 
-### `useAuth()` hook API（`src/lib/auth.tsx`）
+### `useAuth()` hook API (`src/lib/auth.tsx`)
 
 ```typescript
 const { user, ready, isSignedIn, signOut } = useAuth();
-// user: { name: string; email: string } | null（用户资料，可能短暂为 null）
-// ready: boolean（Clerk 加载完成标志）
-// isSignedIn: boolean（session 级别，比 user 更快更新，用于路由守卫）
+// user: { name: string; email: string } | null (profile data; may briefly be null)
+// ready: boolean (Clerk has finished loading)
+// isSignedIn: boolean (session level; updates faster than user, use it for route guards)
 // signOut: () => void
 ```
 
-### 添加更多登录方式（Google / Instagram / WhatsApp）
+### Adding more sign-in methods (Google / Instagram / WhatsApp)
 
-当前登录页使用 Clerk 预制组件，已配置的认证方式会自动显示。要添加新方式：
-1. 在 [Clerk Dashboard](https://dashboard.clerk.com) → Social Connections 启用对应 OAuth provider
-2. 按提示在对应 Developer Console 创建 OAuth 应用并配置回调 URL
-3. `<SignIn />` 组件会自动显示新的登录按钮，无需修改代码
+The login page uses a Clerk pre-built component, so any method enabled in Clerk appears automatically. To add one:
+1. In the [Clerk Dashboard](https://dashboard.clerk.com) → Social Connections, enable the OAuth provider
+2. Create the OAuth app in the provider's developer console and set the callback URL
+3. The `<SignIn />` component shows the new button with no code changes
 
 ---
 
-## 七、AI 助手集成
+## 7. AI assistant integration
 
-`src/lib/deepseek.ts` 定义了一个 TanStack Start 服务端函数，在服务端调用 DeepSeek API，避免 API Key 泄露到客户端。
+`src/lib/deepseek.ts` defines a TanStack Start server function that calls the DeepSeek API on the server, so the API key never reaches the client.
 
-**调用流程**：
+**Call flow**:
 ```
-AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API → 返回答案
+AssistantPanel (client) → askDeepSeek (server function) → DeepSeek API → answer
 ```
 
-**未配置 API Key 时**：返回 `NOT_CONFIGURED` 错误码，前端显示配置提示，不影响其他功能。
+**When no API key is configured**: the function returns a `NOT_CONFIGURED` error code and the UI shows a setup notice. Other features are unaffected.
 
 ---
 
-## 七·五、Gmail 集成（Testing 模式）
+## 7.5. Gmail integration (Testing mode)
 
-Inbox 页可连接用户自己的 Gmail，只读拉取最近 30 天收件箱的 25 封邮件。
+The Inbox page can connect the user's own Gmail and read-only syncs up to 25 emails from the last 30 days of the inbox.
 
-**流程**：`/api/gmail/connect`（跳转 Google 授权）→ `/api/gmail/callback`（换取 token，refresh token 用 AES-GCM 加密后存入 D1 `gmail_accounts`）→ Inbox 调用 `syncGmail` 拉取邮件，存入 `email_messages`。未连接时 Inbox 显示演示数据。
+**Flow**: `/api/gmail/connect` (redirects to Google consent) → `/api/gmail/callback` (exchanges the code; the refresh token is AES-GCM encrypted and stored in D1 `gmail_accounts`) → Inbox calls `syncGmail`, which stores emails in `email_messages`. When Gmail is not connected, the Inbox shows demo data.
 
-| 文件 | 作用 |
-|------|------|
-| `src/lib/gmail.server.ts` | OAuth 换 token、令牌加解密、Gmail API 拉取与解析（仅服务端） |
-| `src/lib/gmail.functions.ts` | `getInbox` / `syncGmail` / `disconnectGmail` 服务端函数 |
-| `src/routes/api.gmail.connect.ts`、`api.gmail.callback.ts` | OAuth 入口与回调（state 存 HttpOnly cookie 防 CSRF） |
-| `drizzle/0001_*.sql` | 新增 `gmail_accounts`、`email_messages` 表 |
+| File | Purpose |
+|------|---------|
+| `src/lib/gmail.server.ts` | OAuth token exchange, token encryption, Gmail API fetch and parsing (server only) |
+| `src/lib/gmail.functions.ts` | `getInbox` / `syncGmail` / `disconnectGmail` server functions |
+| `src/routes/api.gmail.connect.ts`, `api.gmail.callback.ts` | OAuth entry point and callback (state kept in an HttpOnly cookie to prevent CSRF) |
+| `drizzle/0001_*.sql` | Adds the `gmail_accounts` and `email_messages` tables |
 
-**环境变量**：`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`TOKEN_ENCRYPTION_KEY`（`openssl rand -base64 32`）。线上用 `wrangler secret put` 配置，本地写 `.env.local`。
+**Environment variables**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`). In production set them with `wrangler secret put`; locally put them in `.env.local`.
 
-**Google Cloud 配置**：启用 Gmail API → OAuth 同意屏幕（External，Testing）→ 权限 `gmail.readonly` → 把使用者的 Gmail 加为 Test user → 创建 Web application 类型 OAuth Client，Authorized redirect URI 加入 `https://<线上域名>/api/gmail/callback` 和 `http://localhost:8080/api/gmail/callback`。
+**Google Cloud setup**: enable the Gmail API → OAuth consent screen (External, Testing) → add scope `gmail.readonly` → add each user's Gmail address as a Test user → create an OAuth Client of type Web application and add `https://<deployed-domain>/api/gmail/callback` and `http://localhost:8080/api/gmail/callback` as Authorized redirect URIs.
 
-**已知限制**：
-- Testing 模式下授权 7 天过期，需在 Inbox 重新点 Connect Gmail；最多 100 个测试用户；授权页会显示"未验证应用"。
-- 对外正式开放需通过 Google 对受限权限 `gmail.readonly` 的审核（可能需要 CASA 安全评估）。
-- 只读：无法在应用内发送回复，Reply 按钮会打开本机邮件客户端（mailto）。
-- 邮件目前只做展示，可手动"Create repair request from this email"；尚未用 DeepSeek 自动分类或自动关联维修请求。
-- 手动 Sync 或进入 Inbox 时同步，没有定时任务（后续可加 Cron Trigger）。
-
----
-
-## 八、已完成的代码修复与迭代（2026-10-09）
-
-### 第一轮：9 项 Bug 修复
-
-| # | 问题描述 | 涉及文件 |
-|---|---------|---------|
-| 1 | `addRequest` 在请求列表为空时生成 `REQ--Infinity` | `lib/workspace.tsx` |
-| 2 | 请求详情页找不到 ID 时静默 fallback 到 REQ-101 | `routes/requests.$id.tsx` |
-| 3 | 详情页 timeline / 人员 / quote 全部硬编码为 REQ-101 数据 | `routes/requests.$id.tsx` |
-| 4 | Inbox AI 建议操作不随消息切换，切换后 checked 状态不重置 | `routes/inbox.tsx` |
-| 5 | 仪表盘用户名和日期硬编码（"Good morning, Sarah" / "Wednesday, 7 October"） | `routes/index.tsx` |
-| 6 | Profile 下拉菜单点击页面其他区域不会关闭 | `components/AppShell.tsx` |
-| 7 | 通知铃铛只切换红点，无实际内容 | `components/AppShell.tsx` |
-| 8 | `AssistantPanel` 底部 4 个未使用的组件残留死代码 | `components/AssistantPanel.tsx` |
-| 9 | `workspace.$section.tsx` 单组件处理 5 种页面，改为独立子组件 | `routes/workspace.$section.tsx` |
-
-### 第二轮：Clerk 认证接入
-
-| 改动 | 文件 |
-|------|------|
-| 接入 `@clerk/tanstack-react-start`，替换 localStorage mock | `lib/auth.tsx` |
-| 根路由替换为 `ClerkProvider` | `routes/__root.tsx` |
-| 服务端加入 `clerkMiddleware()` | `start.ts` |
-| 登录页实现 Email OTP 两步验证流程（仅登录） | `routes/login.tsx` |
-| 新增环境变量模板 | `.env.example` |
-| 修复 `params` spread 类型错误（exactOptionalPropertyTypes） | `components/AppShell.tsx` |
-| 修复 env var bracket notation 类型错误 | `lib/deepseek.ts` |
-
-### 第三轮：登录/注册改用 Clerk 预制组件
-
-| 改动 | 文件 |
-|------|------|
-| 删除 234 行手写 signal API，改用 `<SignIn withSignUp />` 预制组件 | `routes/login.tsx` |
-| `useAuth()` 增加 `isSignedIn` 字段（session 维度，避免 `useUser` 竞争） | `lib/auth.tsx` |
-| `AppShell` 路由守卫改用 `isSignedIn` 代替 `!user` | `components/AppShell.tsx` |
-| 更新交接文档 | `HANDOVER.md` |
+**Known limitations**:
+- In Testing mode the authorization expires after 7 days; click Connect Gmail in the Inbox again. Up to 100 test users. The consent screen shows an "unverified app" warning.
+- Opening this to the public requires Google's review for the restricted scope `gmail.readonly` (possibly a CASA security assessment).
+- Read-only: replies cannot be sent from the app. The Reply button opens the local email client (mailto).
+- Emails are display-only for now. You can manually use "Create repair request from this email"; DeepSeek classification and automatic linking to requests are not implemented.
+- Sync runs when you click Sync or open the Inbox; there is no scheduled job (a Cron Trigger could be added later).
 
 ---
 
-## 九、代码审查发现（2026-10-09）
+## 8. Completed fixes and iterations
 
-以下问题由代码审查发现，按严重程度排列：
+### Round 1: 9 bug fixes
 
-| # | 严重度 | 问题 | 涉及文件 | 说明 |
-|---|--------|------|----------|------|
-| 1 | ~~P0~~ | ~~数据全部存内存，刷新即丢失~~ | `lib/workspace.tsx` | 已改为 Cloudflare D1 持久化（维修请求）；线上库需执行一次 `--remote` 迁移后才生效 |
-| 2 | P1 | Morning Briefing 硬编码 | `routes/index.tsx:32-36` | `briefing` 数组写死了 3 条请求 ID（REQ-087/093/106），不会随实际数据变化 |
-| 3 | P1 | Inbox 消息硬编码 | `routes/inbox.tsx:38-111` | `seedMessages` 写死了 6 条消息，和 requests 数据没有联动 |
-| 4 | P1 | PM 名字硬编码为 "Sarah Miller" | `routes/requests.$id.tsx:64,273`、`routes/inbox.tsx:257` | 应使用 `useAuth()` 获取当前登录用户真实名字 |
-| 5 | P2 | 无暗黑模式色值 | `styles.css` | 定义了 `@custom-variant dark` 但没有暗黑模式 CSS 变量，只有亮色方案 |
-| 6 | P2 | Logo 字母 "K" 与品牌不符 | `components/AppShell.tsx:177`、`routes/login.tsx:16` | 品牌名 "Banjg Property"，Logo 应为 "B" 或正式标识 |
-| 7 | P2 | "Requests" 导航项指向首页 | `components/AppShell.tsx:29` | `Requests` 的 `to` 设为 `"/"`，和 `Home` 完全重复 |
-| 8 | P2 | Analytics 完成率硬编码 | `routes/workspace.$section.tsx:137` | `"Completion rate"` 写死为 `"91%"`，应从 requests 计算 |
-| 9 | P3 | Modal 缺少 ESC 关闭和遮罩点击关闭 | `routes/index.tsx:227`、`routes/requests.$id.tsx:326` | 多个自定义弹窗没有监听 Escape 键，点击遮罩层也不关闭 |
-| 10 | P3 | Toast ID 用 `Date.now()` 可能冲突 | `lib/workspace.tsx:22` | 同一毫秒触发多个 toast 时 ID 会重复，建议改用递增计数器 |
-| 11 | P3 | `useMemo` 依赖不准确 | `routes/inbox.tsx:136-139` | `actions` 的 memo 依赖只写了 `selectedId`，用 eslint-disable 压制了警告 |
+| # | Problem | Files |
+|---|---------|-------|
+| 1 | `addRequest` produced `REQ--Infinity` when the request list was empty | `lib/workspace.tsx` |
+| 2 | The detail page silently fell back to REQ-101 when an ID was not found | `routes/requests.$id.tsx` |
+| 3 | Detail page timeline / people / quote were all hard-coded to REQ-101 data | `routes/requests.$id.tsx` |
+| 4 | Inbox AI suggested actions did not change with the selected message and checked state was not reset | `routes/inbox.tsx` |
+| 5 | Dashboard user name and date were hard-coded ("Good morning, Sarah" / "Wednesday, 7 October") | `routes/index.tsx` |
+| 6 | The profile dropdown did not close when clicking elsewhere | `components/AppShell.tsx` |
+| 7 | The notification bell only toggled a red dot with no content | `components/AppShell.tsx` |
+| 8 | Four unused components left as dead code at the bottom of `AssistantPanel` | `components/AssistantPanel.tsx` |
+| 9 | `workspace.$section.tsx` handled 5 pages in one component; split into separate components | `routes/workspace.$section.tsx` |
 
-### 做得好的部分
+### Round 2: Clerk authentication
 
-- Clerk 认证集成到位，`useAuth()` 封装干净，`isSignedIn` 避免了竞态
-- DeepSeek 通过 server function 调用，有 Zod 校验，处理了多种异常
-- CSRF 中间件已启用（`start.ts`）
-- 组件结构清晰，有合理的无障碍标注（`aria-label`、`aria-modal`、`aria-live`）
-- TypeScript strict 模式，类型定义清晰，无 `any`
+| Change | Files |
+|--------|-------|
+| Integrated `@clerk/tanstack-react-start`, replacing the localStorage mock | `lib/auth.tsx` |
+| Root route now uses `ClerkProvider` | `routes/__root.tsx` |
+| Added `clerkMiddleware()` on the server | `start.ts` |
+| Login page: Email OTP two-step flow (sign-in only) | `routes/login.tsx` |
+| Added environment variable template | `.env.example` |
+| Fixed `params` spread type error (exactOptionalPropertyTypes) | `components/AppShell.tsx` |
+| Fixed env var bracket-notation type error | `lib/deepseek.ts` |
 
----
+### Round 3: Login and sign-up via Clerk's pre-built component
 
-## 十、待办事项（优先级排序）
+| Change | Files |
+|--------|-------|
+| Removed 234 lines of hand-written signal API code in favour of `<SignIn withSignUp />` | `routes/login.tsx` |
+| `useAuth()` gained `isSignedIn` (session level, avoids a `useUser` race) | `lib/auth.tsx` |
+| `AppShell` route guard now uses `isSignedIn` instead of `!user` | `components/AppShell.tsx` |
 
-### P0 — 上线前必须完成
+### Round 4: Persistence and Gmail
 
-- [x] ~~**数据持久化**~~ → **维修请求已接入 Cloudflare D1**（代码完成，待执行线上迁移并在 Cloudflare 部署验证；Inbox 消息、备注等仍待落库）
-- [x] ~~**真实认证**：替换 localStorage mock，接入真实 Auth~~ → **已完成**（Clerk Email OTP）
-- [ ] **Meta OAuth**：接入 Instagram / WhatsApp Business API，实现真实的社交登录和消息收发
-
-### P1 — 近期规划
-
-- [ ] **消除 PM 名字硬编码**：将 "Sarah Miller" 替换为 `useAuth()` 返回的真实用户名（涉及 `requests.$id.tsx`、`inbox.tsx`）
-- [ ] **Morning Briefing 动态化**：从实际 requests 中筛选需关注项，替换 `index.tsx` 中的硬编码数组
-- [ ] **请求数据模型扩展**：为每个请求添加 `tenantName`、`landlordName`、`tradeName`、`photos`、`timeline` 字段，摆脱从 `waitingOn` 字段推断的临时方案
-- [ ] **文件上传**：租户上传维修照片
-- [ ] **邮件/SMS 集成**：对接 SendGrid / Twilio，实现真实消息发送（当前 "Reply" 和 "Send Reminder" 仅触发 toast）
-- [ ] **日历集成**：对接 Google Calendar 或 Outlook，实现真实预约
-
-### P2 — 中期优化
-
-- [ ] **暗黑模式**：在 `styles.css` 中添加 `.dark` 下的 CSS 变量定义
-- [ ] **品牌标识修正**：Logo 字母从 "K" 改为 "B"，或替换为正式品牌图标
-- [ ] **Analytics 完成率动态计算**：从 requests 数据计算，替换硬编码 "91%"
-- [ ] **Requests 导航项**：移除冗余入口或新建独立列表页
-- [ ] **拖拽看板**：实现 Kanban 卡片拖放（推荐 `@dnd-kit/core`）
-- [ ] **多租户 / 多 PM**：支持多个物业经理账号
-
-### P3 — 长期优化
-
-- [ ] **Modal 交互完善**：ESC 键关闭 + 遮罩点击关闭（或迁移到 Radix Dialog）
-- [ ] **Toast ID 改用计数器**：避免 `Date.now()` 在极端情况下的 ID 冲突
-- [ ] **修正 Inbox useMemo 依赖**：补全依赖数组，移除 eslint-disable 注释
-- [ ] **移动端 App**：基于现有 API 开发 React Native 版本
-- [ ] **报表导出**：PDF / Excel 格式的月度维修报告
+| Change | Files |
+|--------|-------|
+| Repair requests persisted in Cloudflare D1 via Drizzle | `db/schema.ts`, `lib/requests.functions.ts` |
+| Read-only Gmail integration for the Unified Inbox | `lib/gmail.*.ts`, `routes/api.gmail.*.ts`, `routes/inbox.tsx` |
 
 ---
 
-## 十、部署
+## 9. Code review findings
 
-项目使用 TanStack Start（基于 Nitro），构建默认目标是 **Cloudflare Workers**（`cloudflare-module`）。数据库用 D1，binding 在 `wrangler.jsonc` 中声明，构建时 Nitro 会合并进 `.output/server/wrangler.json`。**因此必须部署在 Cloudflare 上**；Vercel 等不提供 D1 binding，数据读写会报 "D1 binding `DB` is not available"。
+Found during code review, ordered by severity:
 
-部署到 Cloudflare：
-1. 先对线上库执行迁移（仅首次或 schema 变更后）：`npx wrangler d1 migrations apply DB --remote`
-2. 构建：`npm run build`
-3. 部署：`npx wrangler deploy --config .output/server/wrangler.json`
-4. 设置 Worker 密钥（`npx wrangler secret put <NAME> --name banjg-property`，按提示粘贴值，不要写进代码或聊天）：
+| # | Severity | Issue | Files | Notes |
+|---|----------|-------|-------|-------|
+| 1 | ~~P0~~ | ~~All data lived in memory and was lost on refresh~~ | `lib/workspace.tsx` | Now persisted in Cloudflare D1 (repair requests); the production database needs a one-time `--remote` migration |
+| 2 | P1 | Morning Briefing is hard-coded | `routes/index.tsx:32-36` | The `briefing` array hard-codes three request IDs (REQ-087/093/106) and does not follow real data |
+| 3 | P1 | Demo inbox messages are hard-coded | `routes/inbox.tsx` | `seedMessages` has six fixed messages with no link to request data (real Gmail emails are used once connected) |
+| 4 | P1 | PM name hard-coded as "Sarah Miller" | `routes/requests.$id.tsx:64,273`, `routes/inbox.tsx` | Should use the signed-in user's real name from `useAuth()` |
+| 5 | P2 | No dark mode colour values | `styles.css` | `@custom-variant dark` is defined but there are no dark CSS variables, only the light theme |
+| 6 | P2 | Logo letter "K" does not match the brand | `components/AppShell.tsx:177`, `routes/login.tsx` | The brand is "Banjg Property"; the logo should be "B" or a proper mark |
+| 7 | P2 | The "Requests" nav item points to the home page | `components/AppShell.tsx:29` | `Requests` sets `to` to `"/"`, duplicating `Home` |
+| 8 | P2 | Analytics completion rate is hard-coded | `routes/workspace.$section.tsx:137` | `"Completion rate"` is fixed at `"91%"` and should be computed from requests |
+| 9 | P3 | Modals lack ESC and backdrop-click to close | `routes/index.tsx:227`, `routes/requests.$id.tsx:326` | Several custom dialogs ignore the Escape key and backdrop clicks |
+| 10 | P3 | Toast IDs use `Date.now()` and can collide | `lib/workspace.tsx:22` | Multiple toasts in the same millisecond share an ID; use an incrementing counter |
+| 11 | P3 | Inaccurate `useMemo` dependencies | `routes/inbox.tsx` | The `actions` memo only lists `selectedId`, and the lint warning is suppressed with eslint-disable |
+
+### Done well
+
+- Clerk integration is solid; the `useAuth()` wrapper is clean and `isSignedIn` avoids the race
+- DeepSeek is called through a server function with Zod validation and handles several failure modes
+- CSRF middleware is enabled (`start.ts`)
+- Clear component structure with sensible accessibility attributes (`aria-label`, `aria-modal`, `aria-live`)
+- TypeScript strict mode with clear types and no `any`
+
+---
+
+## 10. To-do list (by priority)
+
+### P0 — required before launch
+
+- [x] ~~**Data persistence**~~ → **Repair requests now use Cloudflare D1** (code complete; remote migration and verification on Cloudflare still needed; inbox messages and notes are not persisted yet)
+- [x] ~~**Real authentication**: replace the localStorage mock~~ → **Done** (Clerk Email OTP)
+- [ ] **Meta OAuth**: integrate the Instagram / WhatsApp Business API for real social sign-in and messaging
+
+### P1 — near term
+
+- [ ] **Remove the hard-coded PM name**: replace "Sarah Miller" with the real user name from `useAuth()` (`requests.$id.tsx`, `inbox.tsx`)
+- [ ] **Make Morning Briefing dynamic**: pick items needing attention from real requests instead of the hard-coded array in `index.tsx`
+- [ ] **Extend the request data model**: add `tenantName`, `landlordName`, `tradeName`, `photos` and `timeline` to each request instead of inferring from `waitingOn`
+- [ ] **File uploads**: tenants uploading repair photos
+- [ ] **Email/SMS integration**: SendGrid / Twilio for real sending (today "Reply" and "Send Reminder" only show a toast)
+- [ ] **Calendar integration**: Google Calendar or Outlook for real appointments
+
+### P2 — medium term
+
+- [ ] **Dark mode**: add CSS variables under `.dark` in `styles.css`
+- [ ] **Brand mark**: change the logo letter from "K" to "B" or use a proper icon
+- [ ] **Dynamic completion rate in Analytics**: compute from request data instead of the hard-coded "91%"
+- [ ] **Requests nav item**: remove the duplicate entry or add a dedicated list page
+- [ ] **Drag-and-drop kanban**: implement card dragging (`@dnd-kit/core` recommended)
+- [ ] **Multi-tenant / multi-PM**: support several property manager accounts
+
+### P3 — long term
+
+- [ ] **Modal behaviour**: ESC and backdrop-click to close (or migrate to Radix Dialog)
+- [ ] **Toast IDs from a counter**: avoid `Date.now()` collisions
+- [ ] **Fix Inbox useMemo dependencies**: complete the dependency array and drop the eslint-disable comment
+- [ ] **Mobile app**: React Native client on the existing API
+- [ ] **Report export**: monthly repair reports as PDF / Excel
+
+---
+
+## 11. Deployment
+
+The project uses TanStack Start (on Nitro) and builds for **Cloudflare Workers** (`cloudflare-module`) by default. The database is D1; the binding is declared in `wrangler.jsonc` and Nitro merges it into `.output/server/wrangler.json` at build time. **The app must therefore be deployed on Cloudflare**: platforms such as Vercel do not provide the D1 binding, and reads and writes fail with "D1 binding `DB` is not available".
+
+Deploying to Cloudflare:
+1. Migrate the production database (first time, and after schema changes): `npx wrangler d1 migrations apply DB --remote`
+2. Build: `npm run build`
+3. Deploy: `npx wrangler deploy --config .output/server/wrangler.json`
+4. Set Worker secrets (`npx wrangler secret put <NAME> --name banjg-property`, paste the value when prompted; never put them in code or chat):
    - `VITE_CLERK_PUBLISHABLE_KEY`
    - `CLERK_SECRET_KEY`
-   - `DEEPSEEK_API_KEY`（可选）
-5. 在 Clerk Dashboard → Domains，将 Worker 的域名加入白名单
+   - `DEEPSEEK_API_KEY` (optional)
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY` (for Gmail)
+5. In the Clerk Dashboard → Domains, allow the Worker's domain
 
-**当前线上地址**：`https://banjg-property.86yixuanchen.workers.dev`（Worker 名 `banjg-property`，Cloudflare 账号 86yixuanchen@gmail.com）。
+**Current deployment**: `https://banjg-property.86yixuanchen.workers.dev` (Worker name `banjg-property`).
 
-注意：`wrangler.jsonc` 里固定了 `compatibility_date`。Nitro 默认用本机"今天"的日期，而本机时区（澳洲）可能比 Cloudflare 服务器（UTC）早一天，会被拒绝（错误 10021）。更新该日期时请用不晚于 UTC 今天的值。
+Note: `wrangler.jsonc` pins `compatibility_date`. Nitro defaults to the local machine's "today", and a machine in Australian time can be a day ahead of Cloudflare's servers (UTC), which Cloudflare rejects (error 10021). When updating the date, use a value no later than today in UTC.
 
-**已验证**：在本地用 `wrangler dev` 运行构建产物，server 端能通过 `getRequest().runtime.cloudflare.env.DB` 拿到 D1 binding 并执行查询。**未验证**：带 Clerk 登录态的完整读写流程（需要真实登录）。
-
----
-
-*本文档由 Claude Code 自动生成，如有项目背景信息需要补充，请直接编辑此文件。*
+**Verified**: running the build locally with `wrangler dev`, the server obtains the D1 binding through `getRequest().runtime.cloudflare.env.DB` and runs queries. **Not verified**: the full read/write flow with a Clerk session (requires a real sign-in).

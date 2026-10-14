@@ -1,213 +1,213 @@
-# Banjg Property 项目管理与上线计划
+# Banjg Property Project Management and Launch Plan
 
-> 文档状态：Draft 1.0  
-> 更新日期：2026-10-09（Australia/Sydney）  
-> 当前阶段：功能型原型 → 可上线 MVP  
-> 项目目标：为 Property Manager 提供统一的维修工单、沟通、日程、协作平台与 AI 助手。
+> Document status: Draft 1.0
+> Last updated: 2026-10-09 (Australia/Sydney)
+> Current phase: functional prototype → launch-ready MVP
+> Project goal: give property managers a unified platform for repair requests, communication, scheduling, collaboration and an AI assistant.
 
-## 1. 项目目标与成功标准
+## 1. Goals and success criteria
 
-### 1.1 产品目标
+### 1.1 Product goals
 
-- 集中管理物业、联系人、维修请求、报价、附件、日程和沟通记录。
-- 通过 Gmail/Outlook、WhatsApp Business、Instagram、Teams/Slack 等渠道形成统一收件箱。
-- 接入至少一个目标市场常用的 Property Management 平台。
-- 使用 DeepSeek 提供分类、摘要、回复草稿和下一步建议；所有外发与状态变更必须由用户确认。
-- 支持组织、团队和角色隔离，满足真实客户数据的安全要求。
+- Manage properties, contacts, repair requests, quotes, attachments, schedules and communication history in one place.
+- Build a unified inbox from channels such as Gmail/Outlook, WhatsApp Business, Instagram and Teams/Slack.
+- Integrate with at least one property management platform commonly used in the target market.
+- Use DeepSeek for classification, summaries, reply drafts and next-step suggestions; every outbound message and status change must be confirmed by the user.
+- Support organisations, teams and role isolation to meet the security requirements of real customer data.
 
-### 1.2 MVP 上线成功标准
+### 1.2 MVP launch success criteria
 
-- 用户能够安全注册、登录、退出和重置账号。
-- 组织 A 的用户无法访问组织 B 的任何数据。
-- 工单、物业、联系人、消息、附件和时间线均持久化。
-- 至少一个邮件渠道与一个 Property Management 平台完成真实双向同步。
-- DeepSeek 能在真实环境稳定回答，并具备超时、限流、费用与审计控制。
-- 关键 E2E 流程、备份恢复、安全检查、监控和告警全部通过。
-- 不存在 P0/P1 缺陷；上线负责人完成 Go/No-Go 签字。
+- Users can securely register, sign in, sign out and recover their account.
+- Users in organisation A cannot access any data from organisation B.
+- Requests, properties, contacts, messages, attachments and timelines are all persisted.
+- At least one email channel and one property management platform complete real two-way sync.
+- DeepSeek answers reliably in the real environment, with timeout, rate-limit, cost and audit controls.
+- Key E2E flows, backup and restore, security checks, monitoring and alerting all pass.
+- No P0/P1 defects; the launch owner signs off the Go/No-Go decision.
 
-## 2. 当前完成度
+## 2. Current completion
 
-| 模块 | 当前状态 | 说明 |
+| Module | Status | Notes |
 |---|---|---|
-| Dashboard | 原型完成 | 看板、筛选、新建、状态修改、搜索可运行；数据未持久化 |
-| 工单详情 | 原型完成 | 报价审批、提醒、内部备注、时间线可交互 |
-| Unified Inbox | 原型完成 | 渠道筛选、搜索、回复、AI 建议审批为演示数据 |
-| Properties / Contacts | 基础界面完成 | 已有真实路由和搜索；尚无数据库 CRUD |
-| Calendar / Analytics | 基础界面完成 | 已有页面；尚无真实日程源和统计管道 |
-| Settings / Integrations | 基础界面完成 | 有连接入口；尚未实现真实 OAuth 与同步 |
-| 登录 | 前端流程完成 | 邮箱、Instagram、WhatsApp UI 与本地会话；非生产认证 |
-| DeepSeek | 服务端代理完成 | 缺安全环境中的有效密钥及真实请求验证 |
-| 自动化检查 | 基础完成 | 5 个路由测试通过、生产构建通过、Lint 0 错误 |
+| Dashboard | Prototype complete | Kanban, filters, create, status change and search work; data was not persisted at the time of writing |
+| Request detail | Prototype complete | Quote approval, reminders, internal notes and timeline are interactive |
+| Unified Inbox | Prototype complete | Channel filter, search, reply and AI suggestion approval use demo data |
+| Properties / Contacts | Basic UI complete | Real routes and search exist; no database CRUD yet |
+| Calendar / Analytics | Basic UI complete | Pages exist; no real calendar source or statistics pipeline |
+| Settings / Integrations | Basic UI complete | Connection entry points exist; real OAuth and sync not implemented |
+| Sign-in | Front-end flow complete | Email, Instagram and WhatsApp UI with a local session; not production auth |
+| DeepSeek | Server proxy complete | Needs a valid key in a secure environment and real-request verification |
+| Automated checks | Basics complete | 5 route tests pass, production build passes, lint has 0 errors |
 
-## 3. 范围
+## 3. Scope
 
-### 3.1 MVP 范围
+### 3.1 MVP scope
 
-1. 生产认证、组织、角色与权限。
-2. PostgreSQL 数据库、迁移、种子数据和对象存储。
-3. Properties、Contacts、Requests、Quotes、Messages、Attachments、Calendar 的真实 CRUD。
-4. DeepSeek 服务端集成、审计和人工确认机制。
-5. Gmail 或 Outlook 二选一作为首个真实消息渠道。
-6. PropertyMe / Property Tree 或 AppFolio / Buildium 中选择一个作为首个物业平台。
-7. Webhook、同步任务、重试、幂等和连接状态。
-8. 监控、日志、备份、隐私、安全和发布流程。
+1. Production authentication, organisations, roles and permissions.
+2. PostgreSQL database, migrations, seed data and object storage.
+3. Real CRUD for Properties, Contacts, Requests, Quotes, Messages, Attachments and Calendar.
+4. Server-side DeepSeek integration, auditing and human confirmation.
+5. Gmail or Outlook (pick one) as the first real messaging channel.
+6. One of PropertyMe / Property Tree or AppFolio / Buildium as the first property platform.
+7. Webhooks, sync jobs, retries, idempotency and connection status.
+8. Monitoring, logging, backups, privacy, security and the release process.
 
-### 3.2 MVP 后范围
+### 3.2 Post-MVP scope
 
-- 同时支持全部物业平台。
-- 全自动执行 AI 建议。
-- 原生移动 App。
-- 高级财务、租金、会计和完整 CRM。
-- 自定义 BI 报表设计器。
+- Support for all property platforms at once.
+- Fully automatic execution of AI suggestions.
+- Native mobile app.
+- Advanced finance, rent, accounting and a full CRM.
+- A custom BI report designer.
 
-## 4. 工作分解结构（WBS）
+## 4. Work breakdown structure (WBS)
 
-| ID | 工作包 | 主要交付物 | 前置依赖 | 优先级 | 状态 |
+| ID | Work package | Main deliverables | Depends on | Priority | Status |
 |---|---|---|---|---|---|
-| W1 | 产品与架构基线 | MVP 范围、ADR、环境划分、数据分类 | 无 | P0 | 待开始 |
-| W2 | 数据平台 | Schema、迁移、Repository、备份 | W1 | P0 | 待开始 |
-| W3 | 生产认证 | 邮箱认证、Session、组织、RBAC、邀请 | W1, W2 | P0 | 原型完成 |
-| W4 | 核心业务 | Property/Contact/Request/Quote/Attachment CRUD | W2, W3 | P0 | 原型完成 |
-| W5 | DeepSeek | 安全代理、Prompt、限流、审计、成本指标 | W2, W3 | P0 | 部分完成 |
-| W6 | 邮件渠道 | Gmail 或 Outlook OAuth、同步、Webhook、发送 | W2, W3 | P0 | 待开始 |
-| W7 | Meta 渠道 | Instagram、WhatsApp Business OAuth 与 Webhook | W2, W3 | P1 | 待开始 |
-| W8 | 协作渠道 | Teams/Slack 连接与通知 | W2, W3 | P1 | 待开始 |
-| W9 | 物业平台 | 首个平台适配器、字段映射、双向同步 | W2, W3 | P0 | 待开始 |
-| W10 | Dashboard 完成 | 拖拽、批量操作、SLA、实时更新、导出 | W4 | P1 | 部分完成 |
-| W11 | QA 与安全 | 单元/集成/E2E、权限、负载、安全检查 | W3-W10 | P0 | 基础完成 |
-| W12 | 上线准备 | 监控、告警、Runbook、隐私、发布与回滚 | W11 | P0 | 待开始 |
+| W1 | Product and architecture baseline | MVP scope, ADRs, environment split, data classification | None | P0 | Not started |
+| W2 | Data platform | Schema, migrations, repositories, backups | W1 | P0 | Not started |
+| W3 | Production auth | Email auth, sessions, organisations, RBAC, invitations | W1, W2 | P0 | Prototype complete |
+| W4 | Core business | Property/Contact/Request/Quote/Attachment CRUD | W2, W3 | P0 | Prototype complete |
+| W5 | DeepSeek | Secure proxy, prompts, rate limits, audit, cost metrics | W2, W3 | P0 | Partially complete |
+| W6 | Email channel | Gmail or Outlook OAuth, sync, webhooks, sending | W2, W3 | P0 | Not started |
+| W7 | Meta channels | Instagram and WhatsApp Business OAuth and webhooks | W2, W3 | P1 | Not started |
+| W8 | Collaboration channels | Teams/Slack connection and notifications | W2, W3 | P1 | Not started |
+| W9 | Property platform | First platform adapter, field mapping, two-way sync | W2, W3 | P0 | Not started |
+| W10 | Dashboard completion | Drag and drop, bulk actions, SLA, live updates, export | W4 | P1 | Partially complete |
+| W11 | QA and security | Unit/integration/E2E, permissions, load, security checks | W3-W10 | P0 | Basics complete |
+| W12 | Launch readiness | Monitoring, alerting, runbooks, privacy, release and rollback | W11 | P0 | Not started |
 
-## 5. 里程碑路线图
+## 5. Milestone roadmap
 
-由于尚未确定团队容量和发布日期，以下使用依赖驱动里程碑，不承诺具体日期。
+Because team capacity and the release date are not yet fixed, the milestones below are dependency-driven and do not commit to specific dates.
 
-### M0 — 基线冻结
+### M0 — Baseline freeze
 
-- 确定首发国家/地区、首个物业平台和首个邮件渠道。
-- 确定身份提供商、数据库和部署平台。
-- 通过数据分类与隐私评审。
-- 完成条件：架构决策和 MVP 范围获得产品、技术负责人确认。
+- Decide the launch country/region, first property platform and first email channel.
+- Decide the identity provider, database and deployment platform.
+- Pass the data classification and privacy review.
+- Exit criteria: product and engineering leads confirm the architecture decisions and MVP scope.
 
-### M1 — 安全数据基础
+### M1 — Secure data foundation
 
-- 完成数据库、迁移、组织隔离、RBAC 和生产认证。
-- 将现有本地工单数据迁移到持久层。
-- 完成条件：跨组织访问测试全部失败（即成功阻断），核心 CRUD 集成测试通过。
+- Complete the database, migrations, organisation isolation, RBAC and production auth.
+- Migrate the existing local request data to the persistence layer.
+- Exit criteria: all cross-organisation access tests fail (that is, access is blocked) and core CRUD integration tests pass.
 
-### M2 — 核心工作流可用
+### M2 — Core workflow usable
 
-- 完成物业、联系人、工单、报价、附件、日程与审计时间线。
-- 支持工单分派、SLA、批量操作和状态持久化。
-- 完成条件：从报修到关闭的 E2E 流程通过。
+- Complete properties, contacts, requests, quotes, attachments, schedules and the audit timeline.
+- Support request assignment, SLA, bulk actions and persisted status.
+- Exit criteria: the end-to-end flow from reporting a repair to closing it passes.
 
-### M3 — AI 与通讯闭环
+### M3 — AI and communication loop
 
-- 完成 DeepSeek、首个邮件渠道和人工审核机制。
-- AI 能分类消息、关联工单、生成摘要与回复草稿。
-- 完成条件：AI 不可直接外发；失败、超时和配额耗尽均可安全降级。
+- Complete DeepSeek, the first email channel and the human review mechanism.
+- AI can classify messages, link them to requests, and produce summaries and reply drafts.
+- Exit criteria: AI cannot send anything directly; failures, timeouts and exhausted quotas all degrade safely.
 
-### M4 — 物业平台集成
+### M4 — Property platform integration
 
-- 完成首个 Property Management 平台双向同步。
-- 实现字段映射、幂等、冲突处理、重试与同步日志。
-- 完成条件：沙盒环境连续同步验收通过，无重复记录或静默数据丢失。
+- Complete two-way sync with the first property management platform.
+- Implement field mapping, idempotency, conflict handling, retries and sync logs.
+- Exit criteria: continuous sandbox sync passes acceptance with no duplicate records or silent data loss.
 
-### M5 — Release Candidate
+### M5 — Release candidate
 
-- 完成安全、性能、无障碍、跨浏览器和灾备验证。
-- 完成监控、告警、支持流程、隐私文件和回滚演练。
-- 完成条件：所有上线闸门通过，P0/P1 缺陷为零。
+- Complete security, performance, accessibility, cross-browser and disaster-recovery verification.
+- Complete monitoring, alerting, support process, privacy documents and a rollback rehearsal.
+- Exit criteria: all launch gates pass and there are zero P0/P1 defects.
 
-## 6. 关键路径
+## 6. Critical path
 
-`架构基线 → 数据库 → 生产认证/RBAC → 核心业务持久化 → 渠道与物业平台集成 → E2E/安全 → 上线`
+`Architecture baseline → database → production auth/RBAC → core business persistence → channel and property platform integration → E2E/security → launch`
 
-DeepSeek UI、静态页面和非关键视觉优化可并行，但不能替代关键路径工作。未经数据库和权限模型支撑，不应连接真实客户账号或保存真实租客数据。
+The DeepSeek UI, static pages and non-critical visual polish can run in parallel but cannot replace critical-path work. Do not connect real customer accounts or store real tenant data until the database and permission model are in place.
 
-## 7. 产品 Backlog
+## 7. Product backlog
 
-### P0 — 上线阻断
+### P0 — launch blockers
 
-- [ ] 选择并实现认证服务，删除生产环境 localStorage Session。
-- [ ] 建立 PostgreSQL Schema、迁移与租户隔离策略。
-- [ ] 实现服务端授权检查，所有写操作记录审计日志。
-- [ ] 将工单、物业、联系人、消息、报价、附件和日程持久化。
-- [ ] 安全配置并验证新的 `DEEPSEEK_API_KEY`。
-- [ ] 实现 DeepSeek 限流、超时、费用统计和 Prompt 注入防护。
-- [ ] 确定并完成首个邮件渠道。
-- [ ] 确定并完成首个 Property Management 平台。
-- [ ] 建立对象存储、文件扫描与访问控制。
-- [ ] 完成 E2E、权限、安全、备份恢复和回滚验证。
+- [ ] Choose and implement an authentication service; remove the localStorage session in production.
+- [ ] Build the PostgreSQL schema, migrations and tenant isolation policy.
+- [ ] Implement server-side authorisation checks; log every write to an audit log.
+- [ ] Persist requests, properties, contacts, messages, quotes, attachments and schedules.
+- [ ] Configure and verify a new `DEEPSEEK_API_KEY` securely.
+- [ ] Implement DeepSeek rate limiting, timeouts, cost tracking and prompt-injection protection.
+- [ ] Decide on and complete the first email channel.
+- [ ] Decide on and complete the first property management platform.
+- [ ] Set up object storage, file scanning and access control.
+- [ ] Complete E2E, permission, security, backup-restore and rollback verification.
 
-### P1 — MVP 重要能力
+### P1 — important MVP capabilities
 
-- [ ] Instagram 与 WhatsApp Business 正式接入。
-- [ ] Teams/Slack 通知与协作。
-- [ ] Dashboard 拖拽、批量操作、SLA 与实时更新。
-- [ ] 日历双向同步、提醒和冲突检测。
-- [ ] Analytics 真实指标、时间范围和导出。
-- [ ] 通知偏好、失败重试状态和同步日志 UI。
+- [ ] Official Instagram and WhatsApp Business integration.
+- [ ] Teams/Slack notifications and collaboration.
+- [ ] Dashboard drag and drop, bulk actions, SLA and live updates.
+- [ ] Two-way calendar sync, reminders and conflict detection.
+- [ ] Analytics with real metrics, time ranges and export.
+- [ ] Notification preferences, failed-retry status and a sync log UI.
 
-### P2 — 上线后增强
+### P2 — post-launch enhancements
 
-- [ ] 更多物业平台适配器。
-- [ ] 高级自动化规则与模板。
-- [ ] 自定义报表、趋势和容量预测。
-- [ ] 移动端专用体验与离线能力。
+- [ ] More property platform adapters.
+- [ ] Advanced automation rules and templates.
+- [ ] Custom reports, trends and capacity forecasting.
+- [ ] Mobile-specific experience and offline support.
 
-## 8. 集成策略
+## 8. Integration strategy
 
-所有第三方平台使用统一 Adapter 接口：`connect`、`refreshToken`、`pullChanges`、`pushChange`、`verifyWebhook`、`disconnect`。保存外部 source ID、版本、同步时间和幂等键，禁止仅凭名称匹配记录。
+All third-party platforms use one adapter interface: `connect`, `refreshToken`, `pullChanges`, `pushChange`, `verifyWebhook`, `disconnect`. Store the external source ID, version, sync time and idempotency key; never match records by name alone.
 
-首个平台选择标准：目标客户覆盖率、API 可用性、沙盒质量、Webhook 能力、审核周期、速率限制和商业条款。若 API 未公开或权限不可获得，必须在 M0 阶段确认，不得以 UI 模拟代替集成完成。
+Criteria for choosing the first platform: target customer coverage, API availability, sandbox quality, webhook support, review timeline, rate limits and commercial terms. If an API is not public or the required permissions cannot be obtained, this must be confirmed during M0; a UI mock must not be counted as a completed integration.
 
-## 9. 测试与上线闸门
+## 9. Testing and launch gates
 
-| 闸门 | 验收要求 |
+| Gate | Acceptance requirement |
 |---|---|
-| 功能 | 核心报修闭环、登录、权限、同步、AI 审批 E2E 通过 |
-| 数据 | 迁移可重复；幂等；备份恢复演练通过 |
-| 安全 | 无越权；Secret 不进入前端、仓库或日志；Webhook 验签通过 |
-| 性能 | 约定并通过页面、API、同步任务 SLO |
-| 可靠性 | 超时、限流、第三方宕机均有降级与重试 |
-| 隐私 | 隐私政策、数据删除、保留期限和用户请求流程完成 |
-| 可观测性 | 错误率、延迟、同步失败、AI 成本具备 Dashboard 与告警 |
-| 发布 | CI/CD、数据库迁移、Feature Flag、回滚 Runbook 验证通过 |
+| Functionality | Core repair loop, sign-in, permissions, sync and AI approval E2E tests pass |
+| Data | Migrations are repeatable; idempotency holds; backup-restore rehearsal passes |
+| Security | No privilege escalation; secrets never reach the front end, repository or logs; webhook signatures verified |
+| Performance | Page, API and sync-job SLOs are agreed and met |
+| Reliability | Timeouts, rate limits and third-party outages all have fallbacks and retries |
+| Privacy | Privacy policy, data deletion, retention periods and user request process are complete |
+| Observability | Error rate, latency, sync failures and AI cost have dashboards and alerts |
+| Release | CI/CD, database migrations, feature flags and the rollback runbook are verified |
 
-## 10. 风险登记册
+## 10. Risk register
 
-| 风险 | 影响 | 可能性 | 缓解措施 | Owner |
+| Risk | Impact | Likelihood | Mitigation | Owner |
 |---|---|---|---|---|
-| Meta 审核或权限延迟 | 高 | 高 | 尽早创建应用；邮箱登录作为主入口；渠道功能使用 Feature Flag | 待指定 |
-| 物业平台缺少公开 API | 高 | 中 | M0 验证 API/商业权限；准备 CSV 或邮件降级方案 | 待指定 |
-| 多租户越权 | 极高 | 中 | 服务端 RBAC/RLS、权限测试、审计日志 | 待指定 |
-| AI 输出错误或越权执行 | 高 | 中 | 仅建议、人工确认、最小上下文、审计与策略检查 | 待指定 |
-| 第三方消息重复/丢失 | 高 | 中 | 幂等键、游标同步、重试队列、死信队列、对账任务 | 待指定 |
-| 密钥泄露 | 极高 | 中 | Secret 管理、轮换、日志脱敏、提交扫描；聊天中出现的密钥立即撤销 | 待指定 |
-| 范围过大导致延期 | 高 | 高 | 首发只选一个邮件渠道和一个物业平台；P1/P2 严格后置 | 产品负责人 |
+| Meta review or permission delays | High | High | Create the app early; keep email sign-in as the main entry; gate channel features behind feature flags | TBD |
+| Property platform has no public API | High | Medium | Verify API and commercial access in M0; prepare a CSV or email fallback | TBD |
+| Multi-tenant privilege escalation | Critical | Medium | Server-side RBAC/RLS, permission tests, audit logs | TBD |
+| AI output is wrong or acts beyond its authority | High | Medium | Suggestions only, human confirmation, minimal context, audit and policy checks | TBD |
+| Duplicate or lost third-party messages | High | Medium | Idempotency keys, cursor-based sync, retry queue, dead-letter queue, reconciliation job | TBD |
+| Secret leakage | Critical | Medium | Secret management, rotation, log redaction, commit scanning; revoke any key that appears in chat immediately | TBD |
+| Scope too large, causing delay | High | High | Launch with one email channel and one property platform; strictly defer P1/P2 | Product owner |
 
-## 11. 决策日志（待确认）
+## 11. Decision log (pending)
 
-| 决策 | 候选项 | 截止点 | 状态 |
+| Decision | Candidates | Deadline | Status |
 |---|---|---|---|
-| 首发市场 | 澳大利亚 / 新西兰 / 北美 | M0 | 待定 |
-| 首个物业平台 | PropertyMe / Property Tree / AppFolio / Buildium | M0 | 待定 |
-| 首个邮件渠道 | Microsoft 365 / Gmail | M0 | 待定 |
-| 认证方案 | 托管 Auth / 自建 | M0 | 待定 |
-| 数据库与部署 | PostgreSQL 与目标云平台 | M0 | 待定 |
+| Launch market | Australia / New Zealand / North America | M0 | Open |
+| First property platform | PropertyMe / Property Tree / AppFolio / Buildium | M0 | Open |
+| First email channel | Microsoft 365 / Gmail | M0 | Open |
+| Auth approach | Managed auth / self-built | M0 | Open |
+| Database and deployment | PostgreSQL and the target cloud platform | M0 | Open |
 
-## 12. 项目管理节奏
+## 12. Project management cadence
 
-- 每周：Backlog 梳理、依赖检查、风险更新和 Demo。
-- 每个 PR：关联 WBS/Backlog ID，包含测试证据与安全影响。
-- 每个里程碑：产品验收、技术验收、风险复盘和范围确认。
-- 状态定义：`待开始`、`进行中`、`阻塞`、`待验收`、`完成`。
-- 完成定义：代码合并、测试通过、文档更新、监控就绪、产品验收；仅完成 UI 不视为功能完成。
+- Weekly: backlog grooming, dependency check, risk update and demo.
+- Every PR: link a WBS/backlog ID and include test evidence and security impact.
+- Every milestone: product acceptance, technical acceptance, risk review and scope confirmation.
+- Status values: `Not started`, `In progress`, `Blocked`, `Awaiting acceptance`, `Done`.
+- Definition of done: code merged, tests passing, docs updated, monitoring ready, product accepted; finishing only the UI does not count as feature-complete.
 
-## 13. 下一步行动
+## 13. Next actions
 
-1. 产品负责人确认首发市场、首个邮件渠道和首个物业平台。
-2. 技术负责人确定认证、数据库、对象存储和部署方案。
-3. 撤销曾在聊天中出现的 DeepSeek Key，在环境 Secret 中配置新 Key。
-4. 为 W1-W4 创建 Issue，并指定 Owner、估算和目标迭代。
-5. 完成 M0 后，基于真实容量为 WBS 添加日期、基线和正式甘特图。
+1. The product owner confirms the launch market, first email channel and first property platform.
+2. The engineering lead decides on auth, database, object storage and deployment.
+3. Revoke any DeepSeek key that has appeared in chat and configure a new key in the environment secrets.
+4. Create issues for W1-W4 with owners, estimates and target iterations.
+5. After M0, add dates, baselines and a formal Gantt chart to the WBS based on real capacity.
