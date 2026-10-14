@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { auth } from "@clerk/tanstack-react-start/server";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { repairRequests } from "@/db/schema";
+import { repairRequests, requestEvents } from "@/db/schema";
 import { requests as seedRequests, type RepairRequest } from "@/lib/data";
 
 const priority = z.enum(["Urgent", "High", "Medium", "Low"]);
@@ -60,6 +60,11 @@ function toRow(userId: string, r: RepairRequest, sortOrder: number): Row {
     waiting: r.waiting,
     lastUpdate: r.lastUpdate,
     sortOrder,
+    aiSummary: null,
+    aiNextStep: null,
+    aiColumn: null,
+    aiWaitingOn: null,
+    aiUpdatedAt: null,
   };
 }
 
@@ -94,6 +99,14 @@ export const createRequest = createServerFn({ method: "POST" })
     // New requests go to the top of the list, matching the in-memory behaviour.
     const top = Math.min(0, ...existing.map((r) => r.sortOrder));
     await db.insert(repairRequests).values(toRow(userId, data, top - 1));
+    await db.insert(requestEvents).values({
+      userId,
+      requestId: data.id,
+      at: Date.now(),
+      kind: "created",
+      text: `Request created: ${data.title}`,
+      actor: "Property Manager",
+    });
     return { ok: true as const };
   });
 
@@ -106,10 +119,26 @@ export const patchRequest = createServerFn({ method: "POST" })
     const { column: boardColumn, ...rest } = data.patch;
     const set = { ...rest, ...(boardColumn ? { boardColumn } : {}) };
     if (Object.keys(set).length > 0) {
+      const [before] = boardColumn
+        ? await db
+            .select({ column: repairRequests.boardColumn })
+            .from(repairRequests)
+            .where(and(eq(repairRequests.userId, userId), eq(repairRequests.id, data.id)))
+        : [];
       await db
         .update(repairRequests)
         .set(set)
         .where(and(eq(repairRequests.userId, userId), eq(repairRequests.id, data.id)));
+      if (boardColumn && before && before.column !== boardColumn) {
+        await db.insert(requestEvents).values({
+          userId,
+          requestId: data.id,
+          at: Date.now(),
+          kind: "status",
+          text: `Status changed from ${before.column} to ${boardColumn}`,
+          actor: "Property Manager",
+        });
+      }
     }
     return { ok: true as const };
   });

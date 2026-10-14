@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { RequestCard } from "@/components/RequestCard";
-import { columns, type Priority } from "@/lib/data";
+import { columns, priorityTone, type Priority } from "@/lib/data";
 import { useWorkspace } from "@/lib/workspace";
 import { useAuth } from "@/lib/auth";
 
@@ -39,10 +39,24 @@ function Dashboard() {
   const { requests, addRequest, notify } = useWorkspace();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [view, setView] = useState<"board" | "list">("board");
   const [priority, setPriority] = useState<"All" | Priority>("All");
   const now = new Date();
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
   const dateStr = `${dayNames[now.getDay()]}, ${now.getDate()} ${monthNames[now.getMonth()]}`;
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -84,7 +98,9 @@ function Dashboard() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">{dateStr}</p>
-            <h1 className="text-2xl font-semibold tracking-tight">{greeting}, {user?.name ?? "there"}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {greeting}, {user?.name ?? "there"}
+            </h1>
           </div>
           <button
             onClick={() => setNewOpen(true)}
@@ -149,7 +165,30 @@ function Dashboard() {
         </section>
         <section>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-semibold">Repair workflow</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="font-semibold">Repair workflow</h2>
+              <div
+                className="flex rounded-md border bg-card p-0.5 text-xs"
+                role="group"
+                aria-label="View"
+              >
+                {(
+                  [
+                    ["board", "Board"],
+                    ["list", "All events"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setView(key)}
+                    aria-pressed={view === key}
+                    className={`rounded px-2.5 py-1 ${view === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <label className="flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <span className="sr-only sm:not-sr-only">Priority</span>
@@ -166,7 +205,58 @@ function Dashboard() {
               </select>
             </label>
           </div>
-          <div className="grid min-w-[900px] grid-cols-5 gap-4 overflow-x-auto pb-3 lg:min-w-0">
+          {view === "list" ? (
+            <div className="overflow-x-auto rounded-lg border bg-card shadow-card">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead className="border-b bg-muted/50 text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">Request</th>
+                    <th className="px-4 py-2 font-medium">Priority</th>
+                    <th className="px-4 py-2 font-medium">Stage</th>
+                    <th className="px-4 py-2 font-medium">Waiting on</th>
+                    <th className="px-4 py-2 font-medium">Updated</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {filtered.map((r) => (
+                    <tr key={r.id} className="hover:bg-muted/50">
+                      <td className="px-4 py-3">
+                        <Link
+                          to="/requests/$id"
+                          params={{ id: r.id }}
+                          className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                        >
+                          <span className="font-mono text-xs text-muted-foreground">{r.id}</span>
+                          <span className="block font-medium">{r.title}</span>
+                          <span className="block text-xs text-muted-foreground">{r.address}</span>
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded border px-2 py-0.5 text-xs ${priorityTone[r.priority]}`}
+                        >
+                          {r.priority}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">{r.column}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{r.waitingOn}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{r.lastUpdate}</td>
+                    </tr>
+                  ))}
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
+                        No matching requests
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+          <div
+            className={`grid min-w-[900px] grid-cols-5 gap-4 overflow-x-auto pb-3 lg:min-w-0 ${view === "list" ? "hidden" : ""}`}
+          >
             {columns.map((c) => {
               const items = filtered.filter((r) => r.column === c.name);
               return (

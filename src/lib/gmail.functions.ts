@@ -32,16 +32,19 @@ export const getInbox = createServerFn({ method: "GET" }).handler(async () => {
     .from(emailMessages)
     .where(eq(emailMessages.userId, userId))
     .orderBy(desc(emailMessages.receivedAt));
-  const emails: InboxEmail[] = rows.map((r) => ({
-    id: r.id,
-    fromName: r.fromName,
-    fromEmail: r.fromEmail,
-    subject: r.subject,
-    snippet: r.snippet,
-    body: r.body,
-    receivedAt: r.receivedAt,
-    unread: r.unread,
-  }));
+  const own = account.email.toLowerCase();
+  const emails: InboxEmail[] = rows
+    .filter((r) => r.fromEmail !== own)
+    .map((r) => ({
+      id: r.id,
+      fromName: r.fromName,
+      fromEmail: r.fromEmail,
+      subject: r.subject,
+      snippet: r.snippet,
+      body: r.body,
+      receivedAt: r.receivedAt,
+      unread: r.unread,
+    }));
   return {
     connected: true as const,
     email: account.email,

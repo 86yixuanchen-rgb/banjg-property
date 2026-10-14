@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -17,6 +17,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { useWorkspace } from "@/lib/workspace";
 import { disconnectGmail, getInbox, syncGmail, type InboxEmail } from "@/lib/gmail.functions";
+import { linkEmail } from "@/lib/incidents.functions";
 
 export const Route = createFileRoute("/inbox")({
   head: () => ({
@@ -178,6 +179,7 @@ function InboxPage() {
   const [syncing, setSyncing] = useState(false);
   const { addRequest, updateRequest, notify } = useWorkspace();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const inbox = useQuery({ queryKey: ["inbox"], queryFn: () => getInbox(), staleTime: Infinity });
   const connected = inbox.data?.connected === true;
   const messages = useMemo<Msg[]>(
@@ -446,6 +448,8 @@ function InboxPage() {
                         priority: "Medium",
                       });
                       notify(`${created.id} created from email`);
+                      void linkEmail({ data: { emailId: selected.id, requestId: created.id } });
+                      void navigate({ to: "/requests/$id", params: { id: created.id } });
                     }}
                     className="mt-4 w-full rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground"
                   >

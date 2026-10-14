@@ -15,6 +15,13 @@
       "when": 1791963715317,
       "tag": "0001_steep_purple_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791966213104,
+      "tag": "0002_rainy_charles_xavier",
+      "breakpoints": true
     }
   ]
 }
