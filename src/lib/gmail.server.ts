@@ -91,6 +91,15 @@ export async function connectAccount(userId: string, code: string, origin: strin
 
 export class ReconnectRequired extends Error {}
 
+// The seeded demo account has no real mailbox: it never calls Google and never sends email.
+export const DEMO_REFRESH_TOKEN = "demo-account";
+
+async function isDemoAccount(userId: string) {
+  const db = await getDb();
+  const [account] = await db.select().from(gmailAccounts).where(eq(gmailAccounts.userId, userId));
+  return account?.refreshToken === DEMO_REFRESH_TOKEN;
+}
+
 async function accessToken(userId: string, origin: string) {
   const db = await getDb();
   const [account] = await db.select().from(gmailAccounts).where(eq(gmailAccounts.userId, userId));
@@ -195,6 +204,16 @@ function parseMessage(userId: string, m: GmailMessage) {
 }
 
 export async function syncInbox(userId: string, origin: string) {
+  if (await isDemoAccount(userId)) {
+    const db = await getDb();
+    const stored = await db.select().from(emailMessages).where(eq(emailMessages.userId, userId));
+    await db
+      .update(gmailAccounts)
+      .set({ lastSyncAt: Date.now() })
+      .where(eq(gmailAccounts.userId, userId));
+    await autoLinkEmails(userId);
+    return stored.length;
+  }
   const token = await accessToken(userId, origin);
   const headers = { Authorization: `Bearer ${token}` };
   const list = await fetch(
@@ -282,7 +301,8 @@ export async function sendMail(
   origin: string,
   input: { to: string; subject: string; body: string; requestId: string | null; threadId?: string },
 ) {
-  const token = await accessToken(userId, origin);
+  const demo = await isDemoAccount(userId);
+  const token = demo ? "" : await accessToken(userId, origin);
   const db = await getDb();
   const [account] = await db.select().from(gmailAccounts).where(eq(gmailAccounts.userId, userId));
   if (!account) throw new ReconnectRequired("Gmail is not connected");
@@ -307,14 +327,22 @@ export async function sendMail(
     .replace(/\//g, "_")
     .replace(/=+$/, "");
 
-  const res = await fetch(`${GMAIL_API()}/gmail/v1/users/me/messages/send`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ raw, ...(input.threadId ? { threadId: input.threadId } : {}) }),
-  });
-  if (res.status === 403) throw new ReconnectRequired("Gmail send permission is missing");
-  if (!res.ok) throw new Error(`Gmail send failed (${res.status})`);
-  const sent = (await res.json()) as { id: string; threadId?: string };
+  let sent: { id: string; threadId?: string };
+  if (demo) {
+    sent = {
+      id: `demo-sent-${Date.now()}`,
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+    };
+  } else {
+    const res = await fetch(`${GMAIL_API()}/gmail/v1/users/me/messages/send`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ raw, ...(input.threadId ? { threadId: input.threadId } : {}) }),
+    });
+    if (res.status === 403) throw new ReconnectRequired("Gmail send permission is missing");
+    if (!res.ok) throw new Error(`Gmail send failed (${res.status})`);
+    sent = (await res.json()) as { id: string; threadId?: string };
+  }
 
   await db
     .insert(emailMessages)

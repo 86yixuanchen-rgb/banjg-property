@@ -2,6 +2,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { drizzle } from "drizzle-orm/d1";
 import { and, eq } from "drizzle-orm";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -278,5 +279,68 @@ describe("Gmail sync, linking and sending", () => {
         requestId: null,
       }),
     ).rejects.toBeInstanceOf(gmail.ReconnectRequired);
+  });
+});
+
+describe("Demo account", () => {
+  const DEMO = "user_demoaccount1";
+
+  it("seeds a complete, linked data set and can be re-seeded without duplicates", async () => {
+    const seed = () =>
+      execFileSync("node", ["scripts/seed-demo.mjs", DEMO], { encoding: "utf8" })
+        .split(/;\n(?=INSERT|DELETE|--)/)
+        .filter((stmt) => stmt.trim() && !stmt.trim().startsWith("--"));
+    const run = async () => {
+      const raw = (
+        db as unknown as { $client: { prepare(q: string): { run(): Promise<unknown> } } }
+      ).$client;
+      for (const stmt of seed()) await raw.prepare(stmt.trim().replace(/;$/, "")).run();
+    };
+    await run();
+    await run();
+
+    const requests = await db
+      .select()
+      .from(schema.repairRequests)
+      .where(eq(schema.repairRequests.userId, DEMO));
+    expect(requests).toHaveLength(8);
+    expect(new Set(requests.map((r) => r.boardColumn))).toEqual(
+      new Set(["New", "Waiting", "Action Needed", "Scheduled", "Completed"]),
+    );
+    const mail = await db
+      .select()
+      .from(schema.emailMessages)
+      .where(eq(schema.emailMessages.userId, DEMO));
+    expect(mail.filter((m) => m.requestId === null)).toHaveLength(2);
+    expect(
+      mail.every((m) => !/@(gmail|outlook|yahoo|hotmail)\./.test(m.fromEmail + m.toEmails)),
+    ).toBe(true);
+  });
+
+  it("syncs and sends without ever calling Google", async () => {
+    const gmail = await import("@/lib/gmail.server");
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockClear();
+
+    expect(await gmail.syncInbox(DEMO, "https://app.test")).toBeGreaterThan(20);
+    await gmail.sendMail(DEMO, "https://app.test", {
+      to: "david.chen@example.com",
+      subject: "Reminder: air conditioning quote",
+      body: "Hi David, just checking in on the $680 quote.",
+      requestId: "REQ-101",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const [row] = await db
+      .select()
+      .from(schema.emailMessages)
+      .where(
+        and(
+          eq(schema.emailMessages.userId, DEMO),
+          eq(schema.emailMessages.subject, "Reminder: air conditioning quote"),
+        ),
+      );
+    expect(row?.requestId).toBe("REQ-101");
+    expect(row?.fromEmail).toBe("sarah.miller@harbourrealty.example");
   });
 });

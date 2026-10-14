@@ -289,6 +289,23 @@ Each repair request is an "incident". The Dashboard shows all of them (Board vie
 
 ---
 
+## 7.7. Demo account
+
+A fictional data set (8 requests across every stage, 23 people, 27 emails, quotes, appointments, 8 properties, pre-written AI summaries) can be loaded into any one account for demonstrations.
+
+```bash
+node scripts/seed-demo.mjs <clerk_user_id> > demo.sql
+npx wrangler d1 execute DB --local  --file demo.sql    # local database
+npx wrangler d1 execute DB --remote --file demo.sql    # Cloudflare database
+```
+
+- Re-running replaces everything that belongs to that user and touches nobody else.
+- The account gets a `gmail_accounts` row whose refresh token is the marker `demo-account`. For such an account `syncInbox` never calls Google and `sendMail` only records the email locally, so no real email is ever sent (`DEMO_REFRESH_TOKEN` in `lib/gmail.server.ts`). Disconnecting Gmail on that account deletes its emails; re-run the seed to restore them.
+- All addresses use `example.com` or `.example`. The Clerk user must exist first; in a Clerk development instance an address containing `+clerk_test` (for example `demo+clerk_test@example.com`) needs no mailbox and always accepts the code `424242`.
+- Covered by `src/test/gmail-incident.integration.test.ts` ("Demo account").
+
+---
+
 ## 8. Completed fixes and iterations
 
 ### Round 1: 9 bug fixes
