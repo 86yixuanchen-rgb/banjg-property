@@ -14,6 +14,8 @@ import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RequestsIdRouteImport } from './routes/requests.$id'
 import { Route as WorkspaceSectionRouteImport } from './routes/workspace.$section'
+import { Route as ApiGmailCallbackRouteImport } from './routes/api.gmail.callback'
+import { Route as ApiGmailConnectRouteImport } from './routes/api.gmail.connect'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +42,16 @@ const WorkspaceSectionRoute = WorkspaceSectionRouteImport.update({
   path: '/workspace/$section',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGmailCallbackRoute = ApiGmailCallbackRouteImport.update({
+  id: '/api/gmail/callback',
+  path: '/api/gmail/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGmailConnectRoute = ApiGmailConnectRouteImport.update({
+  id: '/api/gmail/connect',
+  path: '/api/gmail/connect',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +59,8 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/requests/$id': typeof RequestsIdRoute
   '/workspace/$section': typeof WorkspaceSectionRoute
+  '/api/gmail/callback': typeof ApiGmailCallbackRoute
+  '/api/gmail/connect': typeof ApiGmailConnectRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +68,8 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/requests/$id': typeof RequestsIdRoute
   '/workspace/$section': typeof WorkspaceSectionRoute
+  '/api/gmail/callback': typeof ApiGmailCallbackRoute
+  '/api/gmail/connect': typeof ApiGmailConnectRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,12 +78,28 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/requests/$id': typeof RequestsIdRoute
   '/workspace/$section': typeof WorkspaceSectionRoute
+  '/api/gmail/callback': typeof ApiGmailCallbackRoute
+  '/api/gmail/connect': typeof ApiGmailConnectRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/inbox' | '/login' | '/requests/$id' | '/workspace/$section'
+  fullPaths:
+    | '/'
+    | '/inbox'
+    | '/login'
+    | '/requests/$id'
+    | '/workspace/$section'
+    | '/api/gmail/callback'
+    | '/api/gmail/connect'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/inbox' | '/login' | '/requests/$id' | '/workspace/$section'
+  to:
+    | '/'
+    | '/inbox'
+    | '/login'
+    | '/requests/$id'
+    | '/workspace/$section'
+    | '/api/gmail/callback'
+    | '/api/gmail/connect'
   id:
     | '__root__'
     | '/'
@@ -75,6 +107,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/requests/$id'
     | '/workspace/$section'
+    | '/api/gmail/callback'
+    | '/api/gmail/connect'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -83,6 +117,8 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   RequestsIdRoute: typeof RequestsIdRoute
   WorkspaceSectionRoute: typeof WorkspaceSectionRoute
+  ApiGmailCallbackRoute: typeof ApiGmailCallbackRoute
+  ApiGmailConnectRoute: typeof ApiGmailConnectRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -122,6 +158,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkspaceSectionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/gmail/callback': {
+      id: '/api/gmail/callback'
+      path: '/api/gmail/callback'
+      fullPath: '/api/gmail/callback'
+      preLoaderRoute: typeof ApiGmailCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/gmail/connect': {
+      id: '/api/gmail/connect'
+      path: '/api/gmail/connect'
+      fullPath: '/api/gmail/connect'
+      preLoaderRoute: typeof ApiGmailConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -131,6 +181,8 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RequestsIdRoute: RequestsIdRoute,
   WorkspaceSectionRoute: WorkspaceSectionRoute,
+  ApiGmailCallbackRoute: ApiGmailCallbackRoute,
+  ApiGmailConnectRoute: ApiGmailConnectRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

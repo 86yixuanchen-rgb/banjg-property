@@ -20,3 +20,27 @@ export const repairRequests = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.id] })],
 );
+
+export const gmailAccounts = sqliteTable("gmail_accounts", {
+  userId: text("user_id").primaryKey(),
+  email: text("email").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  lastSyncAt: integer("last_sync_at"),
+});
+
+export const emailMessages = sqliteTable(
+  "email_messages",
+  {
+    userId: text("user_id").notNull(),
+    id: text("id").notNull(),
+    threadId: text("thread_id").notNull(),
+    fromName: text("from_name").notNull(),
+    fromEmail: text("from_email").notNull(),
+    subject: text("subject").notNull(),
+    snippet: text("snippet").notNull(),
+    body: text("body").notNull(),
+    receivedAt: integer("received_at").notNull(),
+    unread: integer("unread", { mode: "boolean" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.id] })],
+);

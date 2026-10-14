@@ -225,6 +225,32 @@ AssistantPanel（前端） → askDeepSeek（服务端函数） → DeepSeek API
 
 ---
 
+## 七·五、Gmail 集成（Testing 模式）
+
+Inbox 页可连接用户自己的 Gmail，只读拉取最近 30 天收件箱的 25 封邮件。
+
+**流程**：`/api/gmail/connect`（跳转 Google 授权）→ `/api/gmail/callback`（换取 token，refresh token 用 AES-GCM 加密后存入 D1 `gmail_accounts`）→ Inbox 调用 `syncGmail` 拉取邮件，存入 `email_messages`。未连接时 Inbox 显示演示数据。
+
+| 文件 | 作用 |
+|------|------|
+| `src/lib/gmail.server.ts` | OAuth 换 token、令牌加解密、Gmail API 拉取与解析（仅服务端） |
+| `src/lib/gmail.functions.ts` | `getInbox` / `syncGmail` / `disconnectGmail` 服务端函数 |
+| `src/routes/api.gmail.connect.ts`、`api.gmail.callback.ts` | OAuth 入口与回调（state 存 HttpOnly cookie 防 CSRF） |
+| `drizzle/0001_*.sql` | 新增 `gmail_accounts`、`email_messages` 表 |
+
+**环境变量**：`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`TOKEN_ENCRYPTION_KEY`（`openssl rand -base64 32`）。线上用 `wrangler secret put` 配置，本地写 `.env.local`。
+
+**Google Cloud 配置**：启用 Gmail API → OAuth 同意屏幕（External，Testing）→ 权限 `gmail.readonly` → 把使用者的 Gmail 加为 Test user → 创建 Web application 类型 OAuth Client，Authorized redirect URI 加入 `https://<线上域名>/api/gmail/callback` 和 `http://localhost:8080/api/gmail/callback`。
+
+**已知限制**：
+- Testing 模式下授权 7 天过期，需在 Inbox 重新点 Connect Gmail；最多 100 个测试用户；授权页会显示"未验证应用"。
+- 对外正式开放需通过 Google 对受限权限 `gmail.readonly` 的审核（可能需要 CASA 安全评估）。
+- 只读：无法在应用内发送回复，Reply 按钮会打开本机邮件客户端（mailto）。
+- 邮件目前只做展示，可手动"Create repair request from this email"；尚未用 DeepSeek 自动分类或自动关联维修请求。
+- 手动 Sync 或进入 Inbox 时同步，没有定时任务（后续可加 Cron Trigger）。
+
+---
+
 ## 八、已完成的代码修复与迭代（2026-10-09）
 
 ### 第一轮：9 项 Bug 修复

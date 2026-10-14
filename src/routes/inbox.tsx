@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Mail,
   MessageSquare,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { useWorkspace } from "@/lib/workspace";
+import { disconnectGmail, getInbox, syncGmail, type InboxEmail } from "@/lib/gmail.functions";
 
 export const Route = createFileRoute("/inbox")({
   head: () => ({
@@ -109,7 +111,47 @@ const seedMessages = [
     role: "Trade · 17 Elm Pl, Leichhardt",
   },
 ];
-function getActionsForMessage(msg: (typeof seedMessages)[0]): string[] {
+type Msg = {
+  id: string;
+  from: string;
+  ch: string;
+  subj: string;
+  prev: string;
+  body: string;
+  req: string;
+  time: string;
+  unread: boolean;
+  role: string;
+  gmail?: { fromEmail: string };
+};
+
+const demoMessages: Msg[] = seedMessages.map((m) => ({ ...m, id: String(m.id) }));
+
+function formatTime(ms: number) {
+  const d = new Date(ms);
+  const now = new Date();
+  return d.toDateString() === now.toDateString()
+    ? d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : d.toLocaleDateString([], { day: "numeric", month: "short" });
+}
+
+function emailToMsg(e: InboxEmail, read: Set<string>): Msg {
+  return {
+    id: e.id,
+    from: e.fromName,
+    ch: "Email",
+    subj: e.subject,
+    prev: e.snippet,
+    body: e.body,
+    req: "",
+    time: formatTime(e.receivedAt),
+    unread: e.unread && !read.has(e.id),
+    role: `Email · ${e.fromEmail}`,
+    gmail: { fromEmail: e.fromEmail },
+  };
+}
+
+function getActionsForMessage(msg: Msg): string[] {
   const base: string[] = [];
   if (msg.role.startsWith("Landlord")) {
     base.push("Mark landlord approval as received", "Move request to Ready to Schedule");
@@ -126,15 +168,60 @@ function getActionsForMessage(msg: (typeof seedMessages)[0]): string[] {
 function InboxPage() {
   const [ch, setCh] = useState<string>("All");
   const [query, setQuery] = useState("");
-  const [messages, setMessages] = useState(seedMessages);
-  const [selectedId, setSelectedId] = useState(1);
+  const [demo, setDemo] = useState<Msg[]>(demoMessages);
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [selectedId, setSelectedId] = useState("1");
   const [checked, setChecked] = useState<boolean[]>([]);
   const [approved, setApproved] = useState(false);
   const [replying, setReplying] = useState(false);
   const [reply, setReply] = useState("");
-  const { updateRequest, notify } = useWorkspace();
+  const [syncing, setSyncing] = useState(false);
+  const { addRequest, updateRequest, notify } = useWorkspace();
+  const queryClient = useQueryClient();
+  const inbox = useQuery({ queryKey: ["inbox"], queryFn: () => getInbox(), staleTime: Infinity });
+  const connected = inbox.data?.connected === true;
+  const messages = useMemo<Msg[]>(
+    () => (inbox.data?.connected ? inbox.data.emails.map((e) => emailToMsg(e, readIds)) : demo),
+    [inbox.data, demo, readIds],
+  );
+  const selected = messages.find((m) => m.id === selectedId);
+
+  const sync = async () => {
+    setSyncing(true);
+    try {
+      const result = await syncGmail();
+      if (result.ok) {
+        await queryClient.invalidateQueries({ queryKey: ["inbox"] });
+        notify(`Synced ${result.count} emails from Gmail`);
+      } else if (result.code === "RECONNECT") {
+        notify("Gmail authorization expired. Please reconnect.");
+      } else {
+        notify("Gmail sync failed. Please try again.");
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const autoSynced = useRef(false);
+  useEffect(() => {
+    if (connected && !autoSynced.current) {
+      autoSynced.current = true;
+      void sync();
+    }
+  }, [connected]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const status = new URLSearchParams(window.location.search).get("gmail");
+    if (!status) return;
+    if (status === "connected") notify("Gmail connected");
+    else if (status === "denied") notify("Gmail connection was cancelled");
+    else notify("Gmail connection failed. Please try again.");
+    window.history.replaceState(null, "", "/inbox");
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const actions = useMemo(
-    () => (selected ? getActionsForMessage(selected) : []),
+    () => (selected && !selected.gmail ? getActionsForMessage(selected) : []),
     [selectedId], // eslint-disable-line react-hooks/exhaustive-deps
   );
   useEffect(() => {
@@ -153,11 +240,11 @@ function InboxPage() {
       ),
     [messages, ch, query],
   );
-  const selected = messages.find((m) => m.id === selectedId);
-  const choose = (id: number) => {
+  const choose = (id: string) => {
     setSelectedId(id);
     setApproved(false);
-    setMessages((items) => items.map((m) => (m.id === id ? { ...m, unread: false } : m)));
+    if (connected) setReadIds((ids) => new Set(ids).add(id));
+    else setDemo((items) => items.map((m) => (m.id === id ? { ...m, unread: false } : m)));
   };
   const ChannelIcon =
     selected?.ch === "SMS"
@@ -175,6 +262,36 @@ function InboxPage() {
         >
           <div className="border-b p-3">
             <h1 className="mb-2 font-semibold">Unified Inbox</h1>
+            {inbox.isSuccess ? (
+              connected ? (
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+                  <span className="truncate">Gmail: {inbox.data.email}</span>
+                  <span className="flex shrink-0 gap-2">
+                    <button disabled={syncing} onClick={() => void sync()} className="text-primary">
+                      {syncing ? "Syncing…" : "Sync"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        void disconnectGmail().then(() => {
+                          setSelectedId("");
+                          return queryClient.invalidateQueries({ queryKey: ["inbox"] });
+                        });
+                      }}
+                    >
+                      Disconnect
+                    </button>
+                  </span>
+                </div>
+              ) : (
+                <div className="mb-2 rounded-md bg-muted px-2 py-1.5 text-[11px] text-muted-foreground">
+                  Showing demo messages.{" "}
+                  <a href="/api/gmail/connect" className="font-medium text-primary">
+                    Connect Gmail
+                  </a>{" "}
+                  to see your real inbox.
+                </div>
+              )
+            ) : null}
             <div className="relative mb-2">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -231,7 +348,7 @@ function InboxPage() {
           <>
             <div className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
               <button
-                onClick={() => setSelectedId(0)}
+                onClick={() => setSelectedId("")}
                 className="mb-3 flex items-center gap-1 text-sm text-muted-foreground xl:hidden"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -254,12 +371,20 @@ function InboxPage() {
                   <div className="text-sm">
                     <div className="font-medium">{selected.from}</div>
                     <div className="text-xs text-muted-foreground">
-                      {selected.role} · to Sarah Miller
+                      {selected.gmail ? selected.role : `${selected.role} · to Sarah Miller`}
                     </div>
                   </div>
                 </div>
-                <p className="py-6 text-[15px]">{selected.body}</p>
-                {replying ? (
+                <p className="whitespace-pre-wrap break-words py-6 text-[15px]">{selected.body}</p>
+                {selected.gmail ? (
+                  <a
+                    href={`mailto:${selected.gmail.fromEmail}?subject=${encodeURIComponent(/^re:/i.test(selected.subj) ? selected.subj : `Re: ${selected.subj}`)}`}
+                    className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+                  >
+                    <Reply className="h-4 w-4" />
+                    Reply in your email app
+                  </a>
+                ) : replying ? (
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
@@ -302,82 +427,115 @@ function InboxPage() {
               </div>
             </div>
             <aside className="w-full shrink-0 border-l bg-card p-5 xl:w-96">
-              <div className="flex items-center gap-2">
-                <div className="grid h-7 w-7 place-items-center rounded-md bg-ai-soft text-ai">
-                  <Bot className="h-4 w-4" />
-                </div>
-                <span className="text-sm font-semibold">Banjg AI detected:</span>
-              </div>
-              <div className="mt-4 space-y-3 text-sm">
-                <div>
-                  <div className="text-xs text-muted-foreground">Related request</div>
-                  <Link
-                    to="/requests/$id"
-                    params={{ id: selected.req }}
-                    className="font-medium text-primary hover:underline"
+              {selected.gmail ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="grid h-7 w-7 place-items-center rounded-md bg-ai-soft text-ai">
+                      <Mail className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm font-semibold">From your Gmail inbox</span>
+                  </div>
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    This email is not linked to a repair request yet.
+                  </p>
+                  <button
+                    onClick={() => {
+                      const created = addRequest({
+                        title: selected.subj.slice(0, 200),
+                        address: "Address to be confirmed",
+                        priority: "Medium",
+                      });
+                      notify(`${created.id} created from email`);
+                    }}
+                    className="mt-4 w-full rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground"
                   >
-                    {selected.req} — {selected.subj}
-                  </Link>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Detected intent</div>
-                  <span className="inline-flex items-center gap-1 rounded bg-done-soft px-2 py-0.5 font-medium text-done">
-                    <Check className="h-3.5 w-3.5" />
-                    Actionable update received
-                  </span>
-                </div>
-              </div>
-              <div className="mt-5">
-                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Suggested workflow actions
-                </div>
-                <div className="space-y-2">
-                  {actions.map((a, i) => (
-                    <label
-                      key={a}
-                      className="flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm hover:bg-muted"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked[i]}
-                        disabled={approved}
-                        onChange={() =>
-                          setChecked((items) => items.map((v, j) => (j === i ? !v : v)))
-                        }
-                        className="mt-0.5 accent-primary"
-                      />
-                      <span>
-                        <span className="mr-1 text-muted-foreground">{i + 1}.</span>
-                        {a}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              {approved ? (
-                <div className="mt-4 rounded-md bg-done-soft p-3 text-sm text-done">
-                  {checked.filter(Boolean).length} actions approved. Drafts are ready for review.
-                </div>
+                    Create repair request from this email
+                  </button>
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Gmail access is read-only. Nothing is sent or changed in your mailbox.
+                  </p>
+                </>
               ) : (
-                <button
-                  disabled={!checked.some(Boolean)}
-                  onClick={() => {
-                    setApproved(true);
-                    updateRequest(selected.req, {
-                      column: "Scheduled",
-                      status: "Ready to schedule",
-                      lastUpdate: "Just now",
-                    });
-                    notify(`${checked.filter(Boolean).length} workflow actions applied`);
-                  }}
-                  className="mt-4 w-full rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
-                >
-                  Review & Approve Actions
-                </button>
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="grid h-7 w-7 place-items-center rounded-md bg-ai-soft text-ai">
+                      <Bot className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm font-semibold">Banjg AI detected:</span>
+                  </div>
+                  <div className="mt-4 space-y-3 text-sm">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Related request</div>
+                      <Link
+                        to="/requests/$id"
+                        params={{ id: selected.req }}
+                        className="font-medium text-primary hover:underline"
+                      >
+                        {selected.req} — {selected.subj}
+                      </Link>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Detected intent</div>
+                      <span className="inline-flex items-center gap-1 rounded bg-done-soft px-2 py-0.5 font-medium text-done">
+                        <Check className="h-3.5 w-3.5" />
+                        Actionable update received
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-5">
+                    <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Suggested workflow actions
+                    </div>
+                    <div className="space-y-2">
+                      {actions.map((a, i) => (
+                        <label
+                          key={a}
+                          className="flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm hover:bg-muted"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked[i]}
+                            disabled={approved}
+                            onChange={() =>
+                              setChecked((items) => items.map((v, j) => (j === i ? !v : v)))
+                            }
+                            className="mt-0.5 accent-primary"
+                          />
+                          <span>
+                            <span className="mr-1 text-muted-foreground">{i + 1}.</span>
+                            {a}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {approved ? (
+                    <div className="mt-4 rounded-md bg-done-soft p-3 text-sm text-done">
+                      {checked.filter(Boolean).length} actions approved. Drafts are ready for
+                      review.
+                    </div>
+                  ) : (
+                    <button
+                      disabled={!checked.some(Boolean)}
+                      onClick={() => {
+                        setApproved(true);
+                        updateRequest(selected.req, {
+                          column: "Scheduled",
+                          status: "Ready to schedule",
+                          lastUpdate: "Just now",
+                        });
+                        notify(`${checked.filter(Boolean).length} workflow actions applied`);
+                      }}
+                      className="mt-4 w-full rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                    >
+                      Review & Approve Actions
+                    </button>
+                  )}
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Nothing is sent or changed until you approve.
+                  </p>
+                </>
               )}
-              <p className="mt-3 text-xs text-muted-foreground">
-                Nothing is sent or changed until you approve.
-              </p>
             </aside>
           </>
         ) : (
